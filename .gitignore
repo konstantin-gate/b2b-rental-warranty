@@ -1,0 +1,23 @@
+# Build output
+build/
+*.apk
+*.aab
+
+# Gradle
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Memory bank (AI agent working directory)
+.memory_bank/
