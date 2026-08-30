@@ -1,58 +1,60 @@
+@file:Suppress("ktlint:standard:enum-entry-name-case")
+
 package cz.b2brental.db
 
-// Stav vybavení
-enum class EquipmentStatus {
+/** Stav vybavení */
+public enum class EquipmentStatus {
     available,
     rented,
-    maintenance
+    maintenance,
 }
 
-// Stav nájemní smlouvy
-enum class ContractStatus {
+/** Stav nájemní smlouvy */
+public enum class ContractStatus {
     draft,
     pending,
     approved,
     rejected,
     active,
     completed,
-    terminated
+    terminated,
 }
 
-// Stav platby
-enum class PaymentStatus {
+/** Stav platby */
+public enum class PaymentStatus {
     unpaid,
     paid,
-    overdue
+    overdue,
 }
 
-// Stav servisního tiketu
-enum class TicketStatus {
+/** Stav servisního tiketu */
+public enum class TicketStatus {
     new,
     assigned,
     in_progress,
     resolved,
-    rejected
+    rejected,
 }
 
-// Závažnost problému
-enum class Severity {
+/** Závažnost problému */
+public enum class Severity {
     low,
     medium,
-    critical
+    critical,
 }
 
-// Verdikt záruky
-enum class WarrantyVerdict {
+/** Verdikt záruky */
+public enum class WarrantyVerdict {
     covered,
     not_covered,
-    review_required
+    review_required,
 }
 
-// Typ dokumentu
-enum class DocumentType {
+/** Typ dokumentu */
+public enum class DocumentType {
     rental_contract,
     acceptance_act,
     return_act,
     service_report,
-    invoice
+    invoice,
 }

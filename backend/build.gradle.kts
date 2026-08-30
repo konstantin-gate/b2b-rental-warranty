@@ -2,11 +2,13 @@ plugins {
     kotlin("jvm") version "2.0.21"
     kotlin("plugin.serialization") version "2.0.21"
     id("org.jetbrains.kotlinx.kover") version "0.9.1"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
     application
 }
 
 kotlin {
     jvmToolchain(17)
+    explicitApiWarning()
 }
 
 application {
@@ -84,4 +86,11 @@ kover {
             }
         }
     }
+}
+
+ktlint {
+    version.set("1.3.1")
+    android.set(false)
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
 }

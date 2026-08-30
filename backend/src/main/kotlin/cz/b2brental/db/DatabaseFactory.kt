@@ -7,23 +7,25 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 
-// Továrna připojení k databázi - vytváří schéma pomocí Exposed automigration
-object DatabaseFactory {
+/** Továrna připojení k databázi - vytváří schéma pomocí Exposed automigration */
+public object DatabaseFactory {
     private val log = LoggerFactory.getLogger(DatabaseFactory::class.java)
 
-    fun connect(
+    @Suppress("HardCodedStringLiteral")
+    public fun connect(
         dbUrl: String,
         dbUser: String,
         dbPass: String,
-        driver: String = "org.postgresql.Driver"
+        driver: String = "org.postgresql.Driver",
     ) {
-        val config = HikariConfig().apply {
-            jdbcUrl = dbUrl
-            username = dbUser
-            password = dbPass
-            this.driverClassName = driver
-            maximumPoolSize = 10
-        }
+        val config =
+            HikariConfig().apply {
+                jdbcUrl = dbUrl
+                username = dbUser
+                password = dbPass
+                this.driverClassName = driver
+                maximumPoolSize = 10
+            }
         val dataSource = HikariDataSource(config)
         Database.connect(dataSource)
         transaction {
@@ -39,7 +41,7 @@ object DatabaseFactory {
                 WarrantyRules,
                 HistoryEvents,
                 Documents,
-                Notifications
+                Notifications,
             )
         }
         log.info("Databázové schéma vytvořeno/ověřeno")

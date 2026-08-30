@@ -2,51 +2,86 @@ package cz.b2brental.domain
 
 import kotlinx.serialization.Serializable
 
-// Typované identifikátory entit (12 tabulek) — chrání před záměnou id různých entit
+/** Identifikátor společnosti */
 @Serializable
 @JvmInline
-value class CompanyId(val value: Long)
+public value class CompanyId(
+    public val value: Long,
+)
 
+/** Identifikátor uživatele */
 @Serializable
 @JvmInline
-value class UserId(val value: Long)
+public value class UserId(
+    public val value: Long,
+)
 
+/** Identifikátor kategorie vybavení */
 @Serializable
 @JvmInline
-value class EquipmentCategoryId(val value: Long)
+public value class EquipmentCategoryId(
+    public val value: Long,
+)
 
+/** Identifikátor vybavení */
 @Serializable
 @JvmInline
-value class EquipmentId(val value: Long)
+public value class EquipmentId(
+    public val value: Long,
+)
 
+/** Identifikátor nájemní smlouvy */
 @Serializable
 @JvmInline
-value class ContractId(val value: Long)
+public value class ContractId(
+    public val value: Long,
+)
 
+/** Identifikátor položky nájemní smlouvy */
 @Serializable
 @JvmInline
-value class ContractItemId(val value: Long)
+public value class ContractItemId(
+    public val value: Long,
+)
 
+/** Identifikátor platby */
 @Serializable
 @JvmInline
-value class PaymentId(val value: Long)
+public value class PaymentId(
+    public val value: Long,
+)
 
+/** Identifikátor servisního tiketu */
 @Serializable
 @JvmInline
-value class TicketId(val value: Long)
+public value class TicketId(
+    public val value: Long,
+)
 
+/** Identifikátor záručního pravidla */
 @Serializable
 @JvmInline
-value class WarrantyRuleId(val value: Long)
+public value class WarrantyRuleId(
+    public val value: Long,
+)
 
+/** Identifikátor historické události */
 @Serializable
 @JvmInline
-value class HistoryEventId(val value: Long)
+public value class HistoryEventId(
+    public val value: Long,
+)
 
+/** Identifikátor dokumentu */
 @Serializable
 @JvmInline
-value class DocumentId(val value: Long)
+public value class DocumentId(
+    public val value: Long,
+)
 
+/** Identifikátor notifikace */
 @Serializable
 @JvmInline
-value class NotificationId(val value: Long)
+public value class NotificationId(
+    public val value: Long,
+)
