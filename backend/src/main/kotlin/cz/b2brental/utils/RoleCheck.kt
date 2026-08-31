@@ -1,0 +1,27 @@
+@file:Suppress("HardCodedStringLiteral")
+
+package cz.b2brental.utils
+
+import cz.b2brental.auth.JwtService
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
+
+/**
+ * Ověření role z JWT tokenu pro chráněné trasy (volá se z Vlny D).
+ * Není autentizován → UnauthorizedException (401).
+ * Claim "role" chybí nebo role není v seznamu povolených → ForbiddenException (403).
+ */
+public fun ApplicationCall.requireRole(vararg roles: String) {
+    val jwtPrincipal: JWTPrincipal =
+        this.principal()
+            ?: throw UnauthorizedException("Autentizace je povinná pro tento požadavek")
+
+    val role: String =
+        jwtPrincipal[JwtService.CLAIM_ROLE]
+            ?: throw ForbiddenException("Role v tokenu chybí")
+
+    if (role !in roles) {
+        throw ForbiddenException("Role $role nemá přístup k tomuto zdroji")
+    }
+}

@@ -24,3 +24,12 @@ Platforma pro pronájem a záruční servis komerčního chladicího zařízení
 ## Stav
 
 🚧 Ve vývoji
+
+## Demo účty
+
+| Role | E-mail | Heslo |
+|---|---|---|
+| admin | admin@b2b.demo | admin123 |
+| manager | manager@b2b.demo | manager123 |
+| technician | tech@b2b.demo | tech123 |
+| client | kitchen@b2b.demo | kitchen123 |

@@ -21,3 +21,5 @@ Thumbs.db
 
 # Memory bank (AI agent working directory)
 .memory_bank/
+.postman/
+postman/
