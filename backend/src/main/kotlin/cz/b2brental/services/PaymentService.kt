@@ -1,0 +1,136 @@
+@file:Suppress("HardCodedStringLiteral")
+
+package cz.b2brental.services
+
+import cz.b2brental.db.PaymentStatus
+import cz.b2brental.db.Payments
+import cz.b2brental.db.RentalContracts
+import cz.b2brental.domain.ContractId
+import cz.b2brental.domain.PaymentId
+import cz.b2brental.domain.toCzkMoney
+import cz.b2brental.models.PaymentActionResponse
+import cz.b2brental.models.PaymentResponse
+import cz.b2brental.utils.ConflictException
+import cz.b2brental.utils.ForbiddenException
+import cz.b2brental.utils.NotFoundException
+import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+
+/** Služba pro správu a evidenci plateb */
+public class PaymentService(
+    private val clock: Clock = Clock.systemDefaultZone(),
+) {
+    /** Přepne nezaplacené platby po splatnosti na stav overdue */
+    private fun refreshOverdue() {
+        val today: LocalDate = LocalDate.now(clock)
+        transaction {
+            Payments.update({
+                (Payments.status eq PaymentStatus.unpaid) and (Payments.dueDate less today)
+            }) {
+                it[status] = PaymentStatus.overdue
+            }
+        }
+    }
+
+    /** Seznam plateb s volitelným filtrem podle smlouvy a rolí volajícího */
+    public fun list(
+        role: String,
+        callerCompanyId: Long?,
+        contractId: ContractId?,
+    ): List<PaymentResponse> {
+        refreshOverdue()
+        return transaction {
+            val query = Payments.selectAll()
+            when (role) {
+                "admin", "manager" -> {
+                    if (contractId != null) {
+                        query.where { Payments.contractId eq contractId.value }
+                    }
+                }
+                "client" -> {
+                    val compId: Long =
+                        callerCompanyId
+                            ?: throw ForbiddenException("Klient nemá přiřazenou společnost")
+                    val companyContractIds: List<EntityID<Long>> =
+                        RentalContracts
+                            .selectAll()
+                            .where { RentalContracts.companyId eq compId }
+                            .map { it[RentalContracts.id] }
+
+                    if (contractId != null) {
+                        val contractBelongsToCompany: Boolean =
+                            companyContractIds.any { it.value == contractId.value }
+                        if (!contractBelongsToCompany) {
+                            throw ForbiddenException("Nemáte přístup k platbám této smlouvy")
+                        }
+                        query.where { Payments.contractId eq contractId.value }
+                    } else if (companyContractIds.isNotEmpty()) {
+                        query.where { Payments.contractId inList companyContractIds }
+                    }
+                }
+                else -> throw ForbiddenException("Role nemá přístup k platbám")
+            }
+            query.map(::toResponse)
+        }
+    }
+
+    /** Označení platby jako zaplacené */
+    public fun pay(
+        id: PaymentId,
+        role: String,
+        callerCompanyId: Long?,
+    ): PaymentActionResponse =
+        transaction {
+            val row =
+                Payments
+                    .selectAll()
+                    .where { Payments.id eq id.value }
+                    .singleOrNull()
+                    ?: throw NotFoundException("Platba nenalezena")
+
+            if (role == "client") {
+                val contractIdValue: Long = row[Payments.contractId].value
+                val contractOwnerCompanyId: Long? =
+                    RentalContracts
+                        .selectAll()
+                        .where { RentalContracts.id eq contractIdValue }
+                        .map { it[RentalContracts.companyId].value }
+                        .singleOrNull()
+
+                if (contractOwnerCompanyId != callerCompanyId) {
+                    throw ForbiddenException("Nemáte oprávnění platit tuto platbu")
+                }
+            }
+
+            if (row[Payments.status] == PaymentStatus.paid) {
+                throw ConflictException("Platba již byla zaplacena")
+            }
+
+            val now: Instant = Instant.now(clock)
+            Payments.update({ Payments.id eq id.value }) {
+                it[status] = PaymentStatus.paid
+                it[paidAt] = now
+            }
+
+            PaymentActionResponse(id.value, PaymentStatus.paid, now)
+        }
+
+    /** Mapování řádku DB na odpověď o platbě */
+    private fun toResponse(row: ResultRow): PaymentResponse =
+        PaymentResponse(
+            id = row[Payments.id].value,
+            contractId = row[Payments.contractId].value,
+            period = row[Payments.period],
+            amount = row[Payments.amount].toCzkMoney(),
+            dueDate = row[Payments.dueDate],
+            status = row[Payments.status],
+            paidAt = row[Payments.paidAt],
+        )
+}

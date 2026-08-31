@@ -10,7 +10,15 @@ import cz.b2brental.db.seed
 import cz.b2brental.models.ErrorBody
 import cz.b2brental.models.ErrorDetails
 import cz.b2brental.routes.authRoutes
+import cz.b2brental.routes.catalogRoutes
+import cz.b2brental.routes.contractRoutes
+import cz.b2brental.routes.paymentRoutes
+import cz.b2brental.routes.ticketRoutes
 import cz.b2brental.services.AuthService
+import cz.b2brental.services.CatalogService
+import cz.b2brental.services.ContractService
+import cz.b2brental.services.PaymentService
+import cz.b2brental.services.TicketService
 import cz.b2brental.utils.ApiException
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -32,6 +40,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import java.time.Clock
 
 /** Logger neošetřených chyb; detail jde jen do logu, nikdy do těla odpovědi. */
 private val errorLogger = LoggerFactory.getLogger("cz.b2brental.status")
@@ -52,6 +61,11 @@ public fun Application.module() {
 
     val jwtService = JwtService(config.jwtSecret)
     val authService = AuthService(jwtService)
+
+    val catalogService = CatalogService()
+    val contractService = ContractService()
+    val paymentService = PaymentService(Clock.systemDefaultZone())
+    val ticketService = TicketService()
 
     install(ContentNegotiation) {
         json(
@@ -88,7 +102,12 @@ public fun Application.module() {
                     ErrorDetails(
                         code = "VALIDATION_ERROR",
                         message =
-                            (cause.cause?.cause?.message ?: cause.cause?.message ?: cause.message ?: "Neplatná vstupní data").take(250),
+                            (
+                                cause.cause?.cause?.message
+                                    ?: cause.cause?.message
+                                    ?: cause.message
+                                    ?: "Neplatná vstupní data"
+                            ).take(250),
                     ),
                 ),
             )
@@ -177,5 +196,9 @@ public fun Application.module() {
             call.respond(mapOf("status" to "ok"))
         }
         authRoutes(authService)
+        catalogRoutes(catalogService)
+        contractRoutes(contractService)
+        paymentRoutes(paymentService)
+        ticketRoutes(ticketService)
     }
 }
