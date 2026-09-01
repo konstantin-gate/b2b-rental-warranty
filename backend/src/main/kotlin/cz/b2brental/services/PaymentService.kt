@@ -28,7 +28,7 @@ public class PaymentService(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
     /** Přepne nezaplacené platby po splatnosti na stav overdue */
-    private fun refreshOverdue() {
+    internal fun refreshOverdue() {
         val today: LocalDate = LocalDate.now(clock)
         transaction {
             Payments.update({

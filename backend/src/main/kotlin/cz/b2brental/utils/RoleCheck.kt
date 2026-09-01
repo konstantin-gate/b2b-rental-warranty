@@ -25,3 +25,15 @@ public fun ApplicationCall.requireRole(vararg roles: String) {
         throw ForbiddenException("Role $role nemá přístup k tomuto zdroji")
     }
 }
+
+/** Získání role z JWT tokenu nebo prázdného řetězce */
+public fun ApplicationCall.jwtRole(): String {
+    val jwtPrincipal: JWTPrincipal? = this.principal()
+    return jwtPrincipal?.get(JwtService.CLAIM_ROLE) ?: ""
+}
+
+/** Získání ID společnosti z JWT tokenu */
+public fun ApplicationCall.jwtCompanyId(): Long? {
+    val jwtPrincipal: JWTPrincipal? = this.principal()
+    return jwtPrincipal?.get(JwtService.CLAIM_COMPANY_ID)?.toLongOrNull()
+}

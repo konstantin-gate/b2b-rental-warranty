@@ -16,7 +16,7 @@ public object DatabaseFactory {
         dbUrl: String,
         dbUser: String,
         dbPass: String,
-        driver: String = "org.postgresql.Driver",
+        driver: String = if (dbUrl.startsWith("jdbc:h2:")) "org.h2.Driver" else "org.postgresql.Driver",
     ) {
         val config =
             HikariConfig().apply {

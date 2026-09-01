@@ -9,15 +9,21 @@ import cz.b2brental.db.DatabaseFactory
 import cz.b2brental.db.seed
 import cz.b2brental.models.ErrorBody
 import cz.b2brental.models.ErrorDetails
+import cz.b2brental.routes.aiRoutes
 import cz.b2brental.routes.authRoutes
 import cz.b2brental.routes.catalogRoutes
 import cz.b2brental.routes.contractRoutes
+import cz.b2brental.routes.dashboardRoutes
+import cz.b2brental.routes.documentRoutes
 import cz.b2brental.routes.paymentRoutes
 import cz.b2brental.routes.ticketRoutes
+import cz.b2brental.services.AiService
 import cz.b2brental.services.AuthService
 import cz.b2brental.services.CatalogService
 import cz.b2brental.services.ContractService
+import cz.b2brental.services.DashboardService
 import cz.b2brental.services.PaymentService
+import cz.b2brental.services.PdfService
 import cz.b2brental.services.TicketService
 import cz.b2brental.utils.ApiException
 import io.ktor.http.HttpStatusCode
@@ -53,19 +59,20 @@ public fun main() {
 }
 
 /** Konfigurace a inicializace Ktor modulu */
-public fun Application.module() {
-    val config: Config = Config.fromEnv()
-
+public fun Application.module(config: Config = Config.fromEnv()) {
     DatabaseFactory.connect(config.dbUrl, config.dbUser, config.dbPass)
     seed()
 
     val jwtService = JwtService(config.jwtSecret)
     val authService = AuthService(jwtService)
+    val aiService = AiService(config.openaiApiKey)
 
     val catalogService = CatalogService()
     val contractService = ContractService()
     val paymentService = PaymentService(Clock.systemDefaultZone())
-    val ticketService = TicketService()
+    val ticketService = TicketService(aiService)
+    val pdfService = PdfService()
+    val dashboardService = DashboardService(paymentService)
 
     install(ContentNegotiation) {
         json(
@@ -200,5 +207,8 @@ public fun Application.module() {
         contractRoutes(contractService)
         paymentRoutes(paymentService)
         ticketRoutes(ticketService)
+        documentRoutes(pdfService)
+        aiRoutes(aiService, dashboardService)
+        dashboardRoutes(dashboardService)
     }
 }

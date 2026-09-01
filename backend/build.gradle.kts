@@ -1,3 +1,5 @@
+@file:Suppress("HardCodedStringLiteral")
+
 plugins {
     kotlin("jvm") version "2.0.21"
     kotlin("plugin.serialization") version "2.0.21"
@@ -67,6 +69,19 @@ dependencies {
     testImplementation("com.h2database:h2:2.3.232")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+
+    // Pin Netty to patched version (CVE-2025-55163, CVE-2025-58057, CVE-2026-33871)
+    constraints {
+        implementation("io.netty:netty-codec-http2:4.1.132.Final") {
+            because("CVE-2025-55163, CVE-2026-33871")
+        }
+        implementation("io.netty:netty-codec-compression:4.1.132.Final") {
+            because("CVE-2025-58057")
+        }
+        implementation("io.netty:netty-codec-http:4.1.132.Final") {
+            because("CVE-2026-33870")
+        }
+    }
 }
 
 tasks.test {
@@ -77,9 +92,7 @@ kover {
     reports {
         total {
             verify {
-                // Brána pokrytí se do úlohy `check` zapne ve Vlně E (krok E.11);
-                // dokud neexistují testy, porušovala by každé sestavení (0 % < 70 %).
-                onCheck = false
+                onCheck = true
                 rule {
                     minBound(70)
                 }

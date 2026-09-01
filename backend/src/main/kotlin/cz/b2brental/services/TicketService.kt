@@ -38,9 +38,11 @@ import java.time.LocalDate
 import java.util.Base64
 
 /** Služba pro správu servisních požadavků a oprav */
-public class TicketService {
+public class TicketService(
+    private val aiService: AiService,
+) {
     /** Vytvoření nového tiketu klientem s AI diagnostikou a hodnocením záruky */
-    public fun create(
+    public suspend fun create(
         callerCompanyId: Long,
         callerUserId: Long,
         req: TicketCreateRequest,
@@ -61,81 +63,68 @@ public class TicketService {
             }
         }
 
-        return transaction {
-            val eqRow =
-                Equipment
-                    .selectAll()
-                    .where { Equipment.id eq req.equipmentId.value }
-                    .singleOrNull()
+        // FÁZE 1: Načtení dat z DB v krátké transakci
+        val (contractStartDate, warrantyRuleRow) =
+            transaction {
+                Equipment.selectAll().where { Equipment.id eq req.equipmentId.value }.singleOrNull()
                     ?: throw NotFoundException("Vybavení nenalezeno")
 
-            val activeContractIds: List<Long> =
-                RentalContracts
-                    .selectAll()
-                    .where {
-                        (RentalContracts.companyId eq callerCompanyId) and
-                            (RentalContracts.status eq ContractStatus.active)
-                    }.map { it[RentalContracts.id].value }
+                val activeContractIds =
+                    RentalContracts
+                        .selectAll()
+                        .where {
+                            (RentalContracts.companyId eq callerCompanyId) and (RentalContracts.status eq ContractStatus.active)
+                        }.map { it[RentalContracts.id].value }
 
-            val equipmentContractId: Long? =
-                if (activeContractIds.isEmpty()) {
-                    null
-                } else {
-                    ContractItems
+                val equipmentContractId =
+                    (ContractItems innerJoin RentalContracts)
                         .selectAll()
                         .where {
                             (ContractItems.equipmentId eq req.equipmentId.value) and
-                                (ContractItems.contractId inList activeContractIds)
-                        }.map { it[ContractItems.contractId].value }
-                        .singleOrNull()
+                                (RentalContracts.companyId eq callerCompanyId) and
+                                (RentalContracts.status eq ContractStatus.active)
+                        }.singleOrNull()
+                        ?.get(RentalContracts.id)
+                        ?.value
+
+                if (equipmentContractId == null || equipmentContractId !in activeContractIds) {
+                    throw ConflictException("Vybavení není v aktivní smlouvě této společnosti")
                 }
 
-            val contractStartDate: LocalDate? =
-                if (equipmentContractId == null) {
-                    null
-                } else {
-                    RentalContracts
-                        .selectAll()
-                        .where { RentalContracts.id eq equipmentContractId }
-                        .map { it[RentalContracts.startDate] }
-                        .singleOrNull()
-                }
+                val eqRow = Equipment.selectAll().where { Equipment.id eq req.equipmentId.value }.single()
+                val contract = RentalContracts.selectAll().where { RentalContracts.id eq equipmentContractId }.single()
+                val rule = WarrantyRules.selectAll().where { WarrantyRules.categoryId eq eqRow[Equipment.categoryId].value }.singleOrNull()
 
-            if (contractStartDate == null) {
-                throw ConflictException("Aktivní smlouva pro toto vybavení neexistuje")
+                Pair(contract[RentalContracts.startDate], rule)
             }
 
-            val categoryId: Long = eqRow[Equipment.categoryId].value
+        // FÁZE 2: Deterministické hodnocení a AI volání mimo transakci
+        val evaluation: WarrantyEvaluation =
+            if (warrantyRuleRow == null) {
+                WarrantyEvaluation(
+                    WarrantyVerdict.review_required,
+                    "Není záruční pravidlo pro kategorii — vyžaduje ruční posouzení",
+                )
+            } else {
+                val excludedCauses: List<String> =
+                    warrantyRuleRow[WarrantyRules.excludedCauses]
+                        .split(',')
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                WarrantyService.evaluate(
+                    contractStartDate = contractStartDate,
+                    warrantyMonths = warrantyRuleRow[WarrantyRules.warrantyMonths],
+                    description = req.description,
+                    excludedCauses = excludedCauses,
+                    today = LocalDate.now(),
+                )
+            }
 
-            val ruleRow =
-                WarrantyRules
-                    .selectAll()
-                    .where { WarrantyRules.categoryId eq categoryId }
-                    .singleOrNull()
+        val diagnosis: DiagnosisResult = aiService.diagnose(req.description, req.photoBase64)
+        val explanation: String = aiService.explainVerdict(evaluation.verdict, evaluation.reason)
 
-            val evaluation: WarrantyEvaluation =
-                if (ruleRow == null) {
-                    WarrantyEvaluation(
-                        WarrantyVerdict.review_required,
-                        "Není záruční pravidlo pro kategorii — vyžaduje ruční posouzení",
-                    )
-                } else {
-                    val excludedCauses: List<String> =
-                        ruleRow[WarrantyRules.excludedCauses]
-                            .split(',')
-                            .map { it.trim() }
-                            .filter { it.isNotEmpty() }
-                    WarrantyService.evaluate(
-                        contractStartDate = contractStartDate,
-                        warrantyMonths = ruleRow[WarrantyRules.warrantyMonths],
-                        description = req.description,
-                        excludedCauses = excludedCauses,
-                        today = LocalDate.now(),
-                    )
-                }
-
-            val diagnosis: DiagnosisResult = AiService.diagnose(req.description, req.photoBase64)
-
+        // FÁZE 3: Uložení tiketu v krátké transakci
+        return transaction {
             val ticketIdEntity =
                 ServiceTickets.insertAndGetId {
                     it[equipmentId] = EntityID(req.equipmentId.value, Equipment)
@@ -144,7 +133,7 @@ public class TicketService {
                     it[photoBase64] = req.photoBase64
                     it[severity] = diagnosis.severity
                     it[warrantyVerdict] = evaluation.verdict
-                    it[warrantyReason] = AiService.explainVerdict(evaluation.verdict, evaluation.reason)
+                    it[warrantyReason] = explanation
                     it[aiRecommendation] = diagnosis.recommendation
                     it[status] = TicketStatus.new
                 }
