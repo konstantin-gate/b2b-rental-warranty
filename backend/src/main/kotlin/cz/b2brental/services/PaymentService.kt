@@ -2,12 +2,16 @@
 
 package cz.b2brental.services
 
+import cz.b2brental.db.DocumentType
+import cz.b2brental.db.Documents
 import cz.b2brental.db.PaymentStatus
 import cz.b2brental.db.Payments
 import cz.b2brental.db.RentalContracts
+import cz.b2brental.db.Users
 import cz.b2brental.domain.ContractId
 import cz.b2brental.domain.PaymentId
 import cz.b2brental.domain.toCzkMoney
+import cz.b2brental.models.DocumentPdfResponse
 import cz.b2brental.models.PaymentActionResponse
 import cz.b2brental.models.PaymentResponse
 import cz.b2brental.utils.ConflictException
@@ -16,6 +20,7 @@ import cz.b2brental.utils.NotFoundException
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -133,4 +138,59 @@ public class PaymentService(
             status = row[Payments.status],
             paidAt = row[Payments.paidAt],
         )
+
+    /**
+     * Idempotentní získání nebo vytvoření záznamu PDF faktury k platbě.
+     * Klient smí pouze faktury plateb své společnosti.
+     */
+    public fun pdfDocument(
+        id: PaymentId,
+        role: String,
+        callerCompanyId: Long?,
+        callerUserId: Long,
+    ): DocumentPdfResponse =
+        transaction {
+            val payment =
+                Payments
+                    .selectAll()
+                    .where { Payments.id eq id.value }
+                    .singleOrNull() ?: throw NotFoundException("Platba nenalezena")
+
+            if (role == "client") {
+                val contractIdValue: Long = payment[Payments.contractId].value
+                val contractOwnerCompanyId: Long? =
+                    RentalContracts
+                        .selectAll()
+                        .where { RentalContracts.id eq contractIdValue }
+                        .map { it[RentalContracts.companyId].value }
+                        .singleOrNull()
+
+                if (contractOwnerCompanyId != callerCompanyId) {
+                    throw ForbiddenException("Nemáte oprávnění k faktuře této platby")
+                }
+            }
+
+            val existing =
+                Documents
+                    .selectAll()
+                    .where {
+                        (Documents.type eq DocumentType.invoice) and
+                            (Documents.entityType eq "payment") and
+                            (Documents.entityId eq id.value)
+                    }.singleOrNull()
+
+            if (existing != null) {
+                return@transaction DocumentPdfResponse(existing[Documents.id].value)
+            }
+
+            val docId =
+                Documents.insertAndGetId {
+                    it[type] = DocumentType.invoice
+                    it[entityType] = "payment"
+                    it[entityId] = id.value
+                    it[authorId] = EntityID(callerUserId, Users)
+                }
+
+            DocumentPdfResponse(docId.value)
+        }
 }

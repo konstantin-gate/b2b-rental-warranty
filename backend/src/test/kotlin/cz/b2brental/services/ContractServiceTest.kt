@@ -63,7 +63,7 @@ class ContractServiceTest {
     fun pdfDocumentNotFoundTest() {
         val service = ContractService()
         assertFailsWith<NotFoundException> {
-            service.pdfDocument(ContractId(99999), "admin", null)
+            service.pdfDocument(ContractId(99999), "admin", null, 1L)
         }
     }
 
@@ -93,7 +93,7 @@ class ContractServiceTest {
 
         val service = ContractService()
         assertFailsWith<ForbiddenException> {
-            service.pdfDocument(ContractId(contractId), "client", 9999L)
+            service.pdfDocument(ContractId(contractId), "client", 9999L, 1L)
         }
     }
 

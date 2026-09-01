@@ -50,9 +50,3 @@ public data class ContractActionResponse(
     public val status: ContractStatus,
     public val paymentCount: Int? = null,
 )
-
-/** Odpověď s id dokumentu smlouvy (trasa POST /contracts/{id}/pdf přibude ve Vlně E) */
-@Serializable
-public data class ContractPdfResponse(
-    public val documentId: Long,
-)

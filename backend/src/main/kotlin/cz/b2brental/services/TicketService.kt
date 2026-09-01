@@ -17,6 +17,7 @@ import cz.b2brental.db.WarrantyRules
 import cz.b2brental.db.WarrantyVerdict
 import cz.b2brental.domain.TicketId
 import cz.b2brental.models.AssignRequest
+import cz.b2brental.models.DocumentPdfResponse
 import cz.b2brental.models.ResolveRequest
 import cz.b2brental.models.TicketActionResponse
 import cz.b2brental.models.TicketCreateRequest
@@ -319,14 +320,24 @@ public class TicketService(
                 it[resolvedAt] = now
             }
 
-            val docId: Long =
+            val existingDoc =
                 Documents
-                    .insertAndGetId {
-                        it[type] = DocumentType.service_report
-                        it[entityType] = "ticket"
-                        it[entityId] = id.value
-                        it[authorId] = EntityID(callerUserId, Users)
-                    }.value
+                    .selectAll()
+                    .where {
+                        (Documents.type eq DocumentType.service_report) and
+                            (Documents.entityType eq "ticket") and
+                            (Documents.entityId eq id.value)
+                    }.singleOrNull()
+
+            val docId: Long =
+                existingDoc?.get(Documents.id)?.value
+                    ?: Documents
+                        .insertAndGetId {
+                            it[type] = DocumentType.service_report
+                            it[entityType] = "ticket"
+                            it[entityId] = id.value
+                            it[authorId] = EntityID(callerUserId, Users)
+                        }.value
 
             HistoryEvents.insert {
                 it[entityType] = "ticket"
@@ -386,6 +397,68 @@ public class TicketService(
             resolvedAt = row[ServiceTickets.resolvedAt],
         )
     }
+
+    /**
+     * Idempotentní získání nebo vytvoření záznamu PDF servisní zprávy k vyřešenému tiketu.
+     * Klient smí pouze tikety své společnosti, technik pouze tikety přiřazené jemu.
+     */
+    public fun pdfDocument(
+        ticketId: Long,
+        role: String,
+        callerCompanyId: Long?,
+        callerUserId: Long,
+    ): DocumentPdfResponse =
+        transaction {
+            val ticket =
+                ServiceTickets
+                    .selectAll()
+                    .where { ServiceTickets.id eq ticketId }
+                    .singleOrNull() ?: throw NotFoundException("Tiket nenalezen")
+
+            when (role) {
+                "client" -> {
+                    val ownerCompanyId: Long = ticket[ServiceTickets.companyId].value
+                    if (callerCompanyId != ownerCompanyId) {
+                        throw ForbiddenException("Nemáte přístup k tomuto tiketu")
+                    }
+                }
+                "technician" -> {
+                    val assignedTechId: Long? = ticket[ServiceTickets.technicianId]?.value
+                    if (assignedTechId != callerUserId) {
+                        throw ForbiddenException("Nemáte přístup k tomuto tiketu")
+                    }
+                }
+                "manager", "admin" -> Unit
+                else -> throw ForbiddenException("Role nemá přístup")
+            }
+
+            if (ticket[ServiceTickets.status] != TicketStatus.resolved) {
+                throw ConflictException("Servisní zprávu lze generovat pouze pro vyřešený tiket")
+            }
+
+            val existing =
+                Documents
+                    .selectAll()
+                    .where {
+                        (Documents.type eq DocumentType.service_report) and
+                            (Documents.entityType eq "ticket") and
+                            (Documents.entityId eq ticketId)
+                    }.singleOrNull()
+
+            if (existing != null) {
+                return@transaction DocumentPdfResponse(existing[Documents.id].value)
+            }
+
+            val docId =
+                Documents.insertAndGetId {
+                    it[type] = DocumentType.service_report
+                    it[entityType] = "ticket"
+                    it[entityId] = ticketId
+                    it[authorId] = EntityID(callerUserId, Users)
+                }
+
+            DocumentPdfResponse(docId.value)
+        }
 
     /** Konstanty služby */
     public companion object {

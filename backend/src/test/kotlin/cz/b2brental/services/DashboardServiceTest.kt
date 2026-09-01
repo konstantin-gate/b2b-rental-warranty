@@ -56,7 +56,7 @@ class DashboardServiceTest {
     @Test
     fun metricsEmptyTest() {
         val paymentService = PaymentService(fixedClock)
-        val dashboardService = DashboardService(paymentService)
+        val dashboardService = DashboardService(paymentService, fixedClock)
         val metrics = dashboardService.metrics()
         assertEquals(0, metrics.activeContracts)
         assertEquals(0, metrics.openTickets)
@@ -126,12 +126,12 @@ class DashboardServiceTest {
             }
 
         val paymentService = PaymentService(fixedClock)
-        val dashboardService = DashboardService(paymentService)
+        val dashboardService = DashboardService(paymentService, fixedClock)
         val metrics = dashboardService.metrics()
         assertEquals(1, metrics.activeContracts)
         assertEquals(1, metrics.openTickets)
         assertEquals(1, metrics.overduePayments)
-        assertTrue(metrics.overdueAmount.isPositive())
+        assertTrue(metrics.overdueAmount.isPositive)
         assertEquals(1, metrics.equipmentByStatus.available)
         assertEquals(1, metrics.equipmentByStatus.rented)
         assertEquals(0, metrics.equipmentByStatus.maintenance)
@@ -140,7 +140,7 @@ class DashboardServiceTest {
     @Test
     fun metricsAsContextTest() {
         val paymentService = PaymentService(fixedClock)
-        val dashboardService = DashboardService(paymentService)
+        val dashboardService = DashboardService(paymentService, fixedClock)
         val context = dashboardService.metricsAsContext()
         assertTrue(context.contains("Aktivní smlouvy"))
     }

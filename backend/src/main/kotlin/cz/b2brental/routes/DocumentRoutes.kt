@@ -3,13 +3,13 @@
 package cz.b2brental.routes
 
 import cz.b2brental.auth.JwtService
-import cz.b2brental.db.ContractItems
 import cz.b2brental.db.DocumentType
 import cz.b2brental.db.Documents
 import cz.b2brental.db.Payments
 import cz.b2brental.db.RentalContracts
 import cz.b2brental.db.ServiceTickets
 import cz.b2brental.domain.DocumentId
+import cz.b2brental.models.DocumentResponse
 import cz.b2brental.services.PdfService
 import cz.b2brental.utils.BadRequestException
 import cz.b2brental.utils.ForbiddenException
@@ -21,24 +21,83 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.response.header
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
-/** Registrace tras pro stahování PDF dokumentů */
+/** Kontext přihlášeného uživatele pro kontrolu přístupu */
+internal data class CallerContext(
+    val role: String,
+    val companyId: Long?,
+    val userId: Long,
+)
+
+internal fun io.ktor.server.application.ApplicationCall.callerContext(): CallerContext {
+    val principal =
+        principal<JWTPrincipal>()
+            ?: throw ForbiddenException("Neplatný uživatel")
+    return CallerContext(
+        role = principal[JwtService.CLAIM_ROLE] ?: "",
+        companyId = principal[JwtService.CLAIM_COMPANY_ID]?.toLongOrNull(),
+        userId = principal.subject?.toLongOrNull() ?: 0L,
+    )
+}
+
+/** Registrace tras pro přehled a stahování PDF dokumentů */
 public fun Route.documentRoutes(pdfService: PdfService) {
     route("/documents") {
         authenticate("auth-jwt") {
+            get {
+                val ctx = call.callerContext()
+
+                val contractIdParam = call.request.queryParameters["contract_id"]?.toLongOrNull()
+                val ticketIdParam = call.request.queryParameters["ticket_id"]?.toLongOrNull()
+                val paymentIdParam = call.request.queryParameters["payment_id"]?.toLongOrNull()
+
+                val docs =
+                    transaction {
+                        val query = Documents.selectAll()
+
+                        if (contractIdParam != null) {
+                            query.andWhere { (Documents.entityType eq "contract") and (Documents.entityId eq contractIdParam) }
+                        }
+                        if (ticketIdParam != null) {
+                            query.andWhere { (Documents.entityType eq "ticket") and (Documents.entityId eq ticketIdParam) }
+                        }
+                        if (paymentIdParam != null) {
+                            query.andWhere { (Documents.entityType eq "payment") and (Documents.entityId eq paymentIdParam) }
+                        }
+
+                        query.mapNotNull { row ->
+                            val docType = row[Documents.type]
+                            val entityType = row[Documents.entityType]
+                            val entityId = row[Documents.entityId]
+
+                            if (checkDocumentAccess(docType, entityType, entityId, ctx.role, ctx.companyId, ctx.userId)) {
+                                DocumentResponse(
+                                    id = row[Documents.id].value,
+                                    type = docType,
+                                    entityType = entityType,
+                                    entityId = entityId,
+                                    createdAt = row[Documents.createdAt],
+                                )
+                            } else {
+                                null
+                            }
+                        }
+                    }
+
+                call.respond(docs)
+            }
+
             get("/{id}/pdf") {
-                val principal =
-                    call.principal<JWTPrincipal>()
-                        ?: throw ForbiddenException("Neplatný uživatel")
-                val role = principal[JwtService.CLAIM_ROLE] ?: ""
-                val companyId = principal[JwtService.CLAIM_COMPANY_ID]?.toLongOrNull()
-                val userId = principal.subject?.toLongOrNull() ?: 0L
+                val ctx = call.callerContext()
 
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::DocumentId)
@@ -53,7 +112,7 @@ public fun Route.documentRoutes(pdfService: PdfService) {
                 val entityType = docRow[Documents.entityType]
                 val entityId = docRow[Documents.entityId]
 
-                val isAllowed = checkDocumentAccess(docType, entityType, entityId, role, companyId, userId)
+                val isAllowed = checkDocumentAccess(docType, entityType, entityId, ctx.role, ctx.companyId, ctx.userId)
                 if (!isAllowed) {
                     throw ForbiddenException("Nemáte přístup k tomuto dokumentu")
                 }
@@ -69,6 +128,11 @@ public fun Route.documentRoutes(pdfService: PdfService) {
     }
 }
 
+/**
+ * Kontrola přístupu k dokumentu podle role.
+ * admin/manager — všechny dokumenty; technician — pouze service_report svých tiketů;
+ * client — pouze dokumenty entit své společnosti.
+ */
 private fun checkDocumentAccess(
     docType: DocumentType,
     entityType: String,
@@ -112,14 +176,6 @@ private fun checkDocumentAccess(
                                     .singleOrNull()
                             contract?.get(RentalContracts.companyId)?.value == companyId
                         }
-                    }
-                    "equipment" -> {
-                        val contracts =
-                            (ContractItems innerJoin RentalContracts)
-                                .selectAll()
-                                .where { ContractItems.equipmentId eq entityId }
-                                .map { it[RentalContracts.companyId].value }
-                        companyId in contracts
                     }
                     else -> false
                 }

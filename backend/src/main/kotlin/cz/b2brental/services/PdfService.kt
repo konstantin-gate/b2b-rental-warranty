@@ -14,21 +14,17 @@ import com.lowagie.text.pdf.PdfPTable
 import com.lowagie.text.pdf.PdfWriter
 import cz.b2brental.db.Companies
 import cz.b2brental.db.ContractItems
-import cz.b2brental.db.ContractStatus
 import cz.b2brental.db.DocumentType
 import cz.b2brental.db.Equipment
-import cz.b2brental.db.EquipmentCategories
 import cz.b2brental.db.Payments
 import cz.b2brental.db.RentalContracts
 import cz.b2brental.db.ServiceTickets
 import cz.b2brental.db.Users
 import cz.b2brental.domain.formatCzk
 import cz.b2brental.utils.NotFoundException
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.ByteArrayOutputStream
-import java.time.LocalDate
 
 /** Služba pro generování PDF dokumentů v paměti pomocí knihovny OpenPDF */
 public class PdfService {
@@ -67,48 +63,62 @@ public class PdfService {
         return baos.toByteArray()
     }
 
-    private fun Document.addCenteredTitle(
-        text: String,
-        titleFont: Font,
-    ) {
-        val pTitle = Paragraph(text, titleFont)
-        pTitle.alignment = Element.ALIGN_CENTER
-        pTitle.spacingAfter = 15f
-        add(pTitle)
+    /** Načtení společných dat smlouvy (smlouva + společnost + položky) */
+    private fun loadContractData(
+        contractId: Long,
+    ): Triple<
+        org.jetbrains.exposed.sql.ResultRow,
+        org.jetbrains.exposed.sql.ResultRow,
+        List<org.jetbrains.exposed.sql.ResultRow>,
+    > {
+        val contract =
+            RentalContracts
+                .selectAll()
+                .where { RentalContracts.id eq contractId }
+                .singleOrNull() ?: throw NotFoundException("Smlouva nenalezena")
+
+        val company =
+            Companies
+                .selectAll()
+                .where { Companies.id eq contract[RentalContracts.companyId].value }
+                .singleOrNull() ?: throw NotFoundException("Společnost nenalezena")
+
+        val items =
+            (ContractItems innerJoin Equipment)
+                .selectAll()
+                .where { ContractItems.contractId eq contractId }
+                .toList()
+
+        return Triple(contract, company, items)
     }
 
-    private fun Document.addSignature(
-        text: String,
+    /** Vytvoří 2sloupcovou tabulku zařízení (Model + Sériové číslo) */
+    private fun createEquipmentTable(
+        headerLabel: String,
+        items: List<org.jetbrains.exposed.sql.ResultRow>,
+        boldFont: Font,
         regularFont: Font,
-        spacingBefore: Float = 40f,
-    ) {
-        val pSign = Paragraph("\n\n$text", regularFont)
-        pSign.spacingBefore = spacingBefore
-        add(pSign)
+    ): PdfPTable {
+        val table = PdfPTable(2)
+        table.widthPercentage = 100f
+        table.addCell(PdfPCell(Phrase(headerLabel, boldFont)))
+        table.addCell(PdfPCell(Phrase("Sériové číslo", boldFont)))
+        for (row in items) {
+            table.addCell(PdfPCell(Phrase(row[Equipment.model], regularFont)))
+            table.addCell(PdfPCell(Phrase(row[Equipment.serialNumber], regularFont)))
+        }
+        return table
     }
 
     private fun rentalContract(contractId: Long): ByteArray =
         transaction {
-            val contract =
-                RentalContracts
-                    .selectAll()
-                    .where { RentalContracts.id eq contractId }
-                    .singleOrNull() ?: throw NotFoundException("Smlouva nenalezena")
-
-            val company =
-                Companies
-                    .selectAll()
-                    .where { Companies.id eq contract[RentalContracts.companyId].value }
-                    .singleOrNull() ?: throw NotFoundException("Společnost nenalezena")
-
-            val items =
-                (ContractItems innerJoin Equipment)
-                    .selectAll()
-                    .where { ContractItems.contractId eq contractId }
-                    .toList()
+            val (contract, company, items) = loadContractData(contractId)
 
             generatePdf { doc, titleFont, boldFont, regularFont ->
-                doc.addCenteredTitle("Smlouva o nájmu", titleFont)
+                val pTitle = Paragraph("Smlouva o nájmu", titleFont)
+                pTitle.alignment = Element.ALIGN_CENTER
+                pTitle.spacingAfter = 15f
+                doc.add(pTitle)
 
                 doc.add(Paragraph("Pronajímatel: B2B Rental & Warranty s.r.o.", regularFont))
                 doc.add(Paragraph("Nájemce: ${company[Companies.name]} (IČO: ${company[Companies.inn]})", regularFont))
@@ -141,74 +151,70 @@ public class PdfService {
                 doc.add(Paragraph("Jistota (depozit): ${contract[RentalContracts.deposit].formatCzk()}", boldFont))
                 doc.add(Paragraph("Celková částka: ${contract[RentalContracts.totalAmount].formatCzk()}", boldFont))
 
-                doc.addSignature("Dodavatel: _______________________          Odběratel: _______________________", regularFont, 30f)
+                val pSign = Paragraph("\n\nDodavatel: _______________________          Odběratel: _______________________", regularFont)
+                pSign.spacingBefore = 30f
+                doc.add(pSign)
             }
         }
 
-    private fun acceptanceAct(equipmentId: Long): ByteArray =
+    private fun acceptanceAct(contractId: Long): ByteArray =
         transaction {
-            val eq =
-                Equipment
-                    .selectAll()
-                    .where { Equipment.id eq equipmentId }
-                    .singleOrNull() ?: throw NotFoundException("Vybavení nenalezeno")
-
-            val cat =
-                EquipmentCategories
-                    .selectAll()
-                    .where { EquipmentCategories.id eq eq[Equipment.categoryId].value }
-                    .singleOrNull()
-
-            val activeContract =
-                (ContractItems innerJoin RentalContracts)
-                    .selectAll()
-                    .where { (ContractItems.equipmentId eq equipmentId) and (RentalContracts.status eq ContractStatus.active) }
-                    .firstOrNull()
-
-            val companyName =
-                if (activeContract != null) {
-                    Companies
-                        .selectAll()
-                        .where { Companies.id eq activeContract[RentalContracts.companyId].value }
-                        .singleOrNull()
-                        ?.get(Companies.name) ?: "—"
-                } else {
-                    "—"
-                }
+            val (contract, company, items) = loadContractData(contractId)
 
             generatePdf { doc, titleFont, boldFont, regularFont ->
-                doc.addCenteredTitle("Dodací list — protokol o uvedení do provozu", titleFont)
+                val pTitle = Paragraph("Dodací list — protokol o uvedení do provozu", titleFont)
+                pTitle.alignment = Element.ALIGN_CENTER
+                pTitle.spacingAfter = 15f
+                doc.add(pTitle)
 
-                doc.add(Paragraph("Zařízení: ${eq[Equipment.model]}", boldFont))
-                doc.add(Paragraph("Sériové číslo: ${eq[Equipment.serialNumber]}", regularFont))
-                doc.add(Paragraph("Kategorie: ${cat?.get(EquipmentCategories.name) ?: "—"}", regularFont))
-                doc.add(Paragraph("Odběratel: $companyName", regularFont))
-                doc.add(Paragraph("Datum předání: ${LocalDate.now()}", regularFont))
+                doc.add(Paragraph("Číslo smlouvy: $contractId", boldFont))
+                doc.add(Paragraph("Dodavatel: B2B Rental & Warranty s.r.o.", regularFont))
+                doc.add(Paragraph("Odběratel: ${company[Companies.name]} (IČO: ${company[Companies.inn]})", regularFont))
+                doc.add(Paragraph("Místo instalace: ${contract[RentalContracts.deliveryAddress]}", regularFont))
+                doc.add(Paragraph("Datum předání: ${contract[RentalContracts.startDate]}", regularFont))
                 doc.add(Paragraph("Stav: v provozu", regularFont))
 
-                doc.addSignature("Předal technik: ___________________          Převzal zástupce: ___________________", regularFont)
+                val pSpace = Paragraph(" ", regularFont)
+                pSpace.spacingAfter = 10f
+                doc.add(pSpace)
+
+                doc.add(createEquipmentTable("Předané zařízení (Model)", items, boldFont, regularFont))
+
+                val pSign = Paragraph("\n\nPředal technik: ___________________          Převzal zástupce: ___________________", regularFont)
+                pSign.spacingBefore = 40f
+                doc.add(pSign)
             }
         }
 
-    private fun returnAct(equipmentId: Long): ByteArray =
+    private fun returnAct(contractId: Long): ByteArray =
         transaction {
-            val eq =
-                Equipment
-                    .selectAll()
-                    .where { Equipment.id eq equipmentId }
-                    .singleOrNull() ?: throw NotFoundException("Vybavení nenalezeno")
+            val (contract, company, items) = loadContractData(contractId)
 
             generatePdf { doc, titleFont, boldFont, regularFont ->
-                doc.addCenteredTitle("Protokol o vrácení", titleFont)
+                val pTitle = Paragraph("Protokol o vrácení zařízení", titleFont)
+                pTitle.alignment = Element.ALIGN_CENTER
+                pTitle.spacingAfter = 15f
+                doc.add(pTitle)
 
-                doc.add(Paragraph("Zařízení: ${eq[Equipment.model]}", boldFont))
-                doc.add(Paragraph("Sériové číslo: ${eq[Equipment.serialNumber]}", regularFont))
-                doc.add(Paragraph("Datum vrácení: ${LocalDate.now()}", regularFont))
-                doc.add(Paragraph("Stav vybavení při vrácení: _________________________________", regularFont))
+                doc.add(Paragraph("Číslo smlouvy: $contractId", boldFont))
+                doc.add(Paragraph("Pronajímatel: B2B Rental & Warranty s.r.o.", regularFont))
+                doc.add(Paragraph("Nájemce: ${company[Companies.name]} (IČO: ${company[Companies.inn]})", regularFont))
+                doc.add(Paragraph("Datum vrácení: ${contract[RentalContracts.endDate]}", regularFont))
+
+                val pSpace = Paragraph(" ", regularFont)
+                pSpace.spacingAfter = 10f
+                doc.add(pSpace)
+
+                doc.add(createEquipmentTable("Vrácené zařízení (Model)", items, boldFont, regularFont))
+
+                doc.add(Paragraph("\nStav vybavení při vrácení: _________________________________", regularFont))
                 doc.add(Paragraph("Zjištěná opotřebení a poškození: ___________________________", regularFont))
                 doc.add(Paragraph("Vypočtená náhrada: _________________________________________", regularFont))
 
-                doc.addSignature("Vrátil klient: _____________________          Převzal technik: _____________________", regularFont)
+                val pSign =
+                    Paragraph("\n\nVrátil klient: _____________________          Převzal technik: _____________________", regularFont)
+                pSign.spacingBefore = 40f
+                doc.add(pSign)
             }
         }
 
@@ -236,7 +242,10 @@ public class PdfService {
                 } ?: "Nepřiřazeno"
 
             generatePdf { doc, titleFont, boldFont, regularFont ->
-                doc.addCenteredTitle("Servisní zpráva", titleFont)
+                val pTitle = Paragraph("Servisní zpráva", titleFont)
+                pTitle.alignment = Element.ALIGN_CENTER
+                pTitle.spacingAfter = 15f
+                doc.add(pTitle)
 
                 doc.add(Paragraph("Číslo tiketu: $ticketId", boldFont))
                 doc.add(Paragraph("Vybavení: ${eq?.get(Equipment.model)} (S/N: ${eq?.get(Equipment.serialNumber)})", regularFont))
@@ -257,7 +266,10 @@ public class PdfService {
                     ),
                 )
 
-                doc.addSignature("Podpis technika: ____________________          Podpis zákazníka: ____________________", regularFont)
+                val pSign =
+                    Paragraph("\n\nPodpis technika: ____________________          Podpis zákazníka: ____________________", regularFont)
+                pSign.spacingBefore = 40f
+                doc.add(pSign)
             }
         }
 
@@ -282,7 +294,10 @@ public class PdfService {
                     .singleOrNull() ?: throw NotFoundException("Společnost nenalezena")
 
             generatePdf { doc, titleFont, boldFont, regularFont ->
-                doc.addCenteredTitle("Faktura (daňový doklad)", titleFont)
+                val pTitle = Paragraph("Faktura (daňový doklad)", titleFont)
+                pTitle.alignment = Element.ALIGN_CENTER
+                pTitle.spacingAfter = 15f
+                doc.add(pTitle)
 
                 doc.add(Paragraph("Dodavatel: B2B Rental & Warranty s.r.o.", regularFont))
                 doc.add(Paragraph("Odběratel: ${company[Companies.name]} (IČO: ${company[Companies.inn]})", regularFont))

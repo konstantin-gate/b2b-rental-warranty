@@ -22,7 +22,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
 /** Výsledek diagnostiky AI */
@@ -215,11 +217,14 @@ public class AiService(
     private fun parseDiagnosis(answer: String): DiagnosisResult {
         val json: JsonObject = extractJsonObject(answer) ?: return fallbackDiagnose()
         return try {
-            val cause: String = json["possible_cause"]?.toString()?.trim('"') ?: return fallbackDiagnose()
-            val severityRaw: String = json["severity"]?.toString()?.trim('"') ?: "medium"
-            val severity: Severity = if (severityRaw in ALLOWED_SEVERITY) Severity.valueOf(severityRaw) else Severity.medium
+            val cause: String =
+                json["possible_cause"]?.jsonPrimitive?.contentOrNull ?: return fallbackDiagnose()
+            val severityRaw: String =
+                json["severity"]?.jsonPrimitive?.contentOrNull ?: "medium"
+            val severity: Severity =
+                if (severityRaw in ALLOWED_SEVERITY) Severity.valueOf(severityRaw) else Severity.medium
             val recommendation: String =
-                json["recommendation"]?.toString()?.trim('"')
+                json["recommendation"]?.jsonPrimitive?.contentOrNull
                     ?: "Vyžaduje ruční diagnostiku technikem"
             DiagnosisResult(cause, severity, recommendation)
         } catch (_: Throwable) {

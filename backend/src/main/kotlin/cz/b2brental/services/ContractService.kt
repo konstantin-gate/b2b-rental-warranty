@@ -12,14 +12,15 @@ import cz.b2brental.db.EquipmentStatus
 import cz.b2brental.db.PaymentStatus
 import cz.b2brental.db.Payments
 import cz.b2brental.db.RentalContracts
+import cz.b2brental.db.Users
 import cz.b2brental.domain.ContractId
 import cz.b2brental.domain.toCzkMoney
 import cz.b2brental.domain.toDbBigDecimal
 import cz.b2brental.models.ContractActionResponse
 import cz.b2brental.models.ContractCreateRequest
 import cz.b2brental.models.ContractItemResponse
-import cz.b2brental.models.ContractPdfResponse
 import cz.b2brental.models.ContractResponse
+import cz.b2brental.models.DocumentPdfResponse
 import cz.b2brental.utils.BadRequestException
 import cz.b2brental.utils.ConflictException
 import cz.b2brental.utils.ForbiddenException
@@ -27,8 +28,6 @@ import cz.b2brental.utils.NotFoundException
 import org.javamoney.moneta.Money
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertAndGetId
@@ -202,19 +201,47 @@ public class ContractService {
             ContractActionResponse(id.value, ContractStatus.rejected)
         }
 
-    /** Idempotentní metadatový záznam PDF smlouvy (samotné PDF generuje Vlna E) */
+    /** Získání nebo vytvoření PDF dokumentu smlouvy */
     public fun pdfDocument(
         id: ContractId,
         role: String,
         callerCompanyId: Long?,
-    ): ContractPdfResponse =
+        callerUserId: Long,
+    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.rental_contract, role, callerCompanyId, callerUserId)
+
+    /** Získání nebo vytvoření předávacího protokolu (akceptačního aktu) */
+    public fun acceptanceActDocument(
+        id: ContractId,
+        role: String,
+        callerCompanyId: Long?,
+        callerUserId: Long,
+    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.acceptance_act, role, callerCompanyId, callerUserId)
+
+    /** Získání nebo vytvoření protokolu o vrácení zařízení */
+    public fun returnActDocument(
+        id: ContractId,
+        role: String,
+        callerCompanyId: Long?,
+        callerUserId: Long,
+    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.return_act, role, callerCompanyId, callerUserId)
+
+    /**
+     * Idempotentní získání nebo vytvoření záznamu dokumentu smlouvy.
+     * Dokument lze generovat výhradně pro aktivní smlouvu; klient smí pouze dokumenty své společnosti.
+     */
+    private fun createOrGetContractDoc(
+        id: ContractId,
+        docType: DocumentType,
+        role: String,
+        callerCompanyId: Long?,
+        callerUserId: Long,
+    ): DocumentPdfResponse =
         transaction {
             val row =
                 RentalContracts
                     .selectAll()
                     .where { RentalContracts.id eq id.value }
-                    .singleOrNull()
-                    ?: throw NotFoundException("Smlouva nenalezena")
+                    .singleOrNull() ?: throw NotFoundException("Smlouva nenalezena")
 
             if (role == "client" && row[RentalContracts.companyId].value != callerCompanyId) {
                 throw ForbiddenException("Nemáte přístup k této smlouvě")
@@ -228,23 +255,24 @@ public class ContractService {
                 Documents
                     .selectAll()
                     .where {
-                        (Documents.type eq DocumentType.rental_contract) and
+                        (Documents.type eq docType) and
                             (Documents.entityType eq "contract") and
                             (Documents.entityId eq id.value)
                     }.singleOrNull()
 
             if (existing != null) {
-                return@transaction ContractPdfResponse(existing[Documents.id].value)
+                return@transaction DocumentPdfResponse(existing[Documents.id].value)
             }
 
             val newDocId =
                 Documents.insertAndGetId {
-                    it[type] = DocumentType.rental_contract
+                    it[type] = docType
                     it[entityType] = "contract"
                     it[entityId] = id.value
+                    it[authorId] = EntityID(callerUserId, Users)
                 }
 
-            ContractPdfResponse(newDocId.value)
+            DocumentPdfResponse(newDocId.value)
         }
 
     /** Interní načtení smlouvy podle id */

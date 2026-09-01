@@ -2,7 +2,6 @@
 
 package cz.b2brental.routes
 
-import cz.b2brental.auth.JwtService
 import cz.b2brental.domain.TicketId
 import cz.b2brental.models.AssignRequest
 import cz.b2brental.models.ResolveRequest
@@ -14,8 +13,6 @@ import cz.b2brental.utils.ForbiddenException
 import cz.b2brental.utils.requireRole
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -29,29 +26,19 @@ public fun Route.ticketRoutes(service: TicketService) {
         authenticate("auth-jwt") {
             post {
                 call.requireRole("client")
-                val principal: JWTPrincipal =
-                    call.principal<JWTPrincipal>() ?: throw ForbiddenException("Neplatný uživatel")
-                val userId: Long =
-                    principal.subject?.toLongOrNull()
-                        ?: throw ForbiddenException("Neplatný uživatel")
-                val companyId: Long =
-                    principal[JwtService.CLAIM_COMPANY_ID]?.toLongOrNull()
+                val ctx = call.callerContext()
+                val companyId =
+                    ctx.companyId
                         ?: throw ForbiddenException("Uživatel nemá přiřazenou společnost")
                 val req = call.receive<TicketCreateRequest>()
-                val response: TicketResponse = service.create(companyId, userId, req)
+                val response: TicketResponse = service.create(companyId, ctx.userId, req)
                 call.respond(HttpStatusCode.Created, response)
             }
 
             get {
                 call.requireRole("client", "technician", "manager", "admin")
-                val principal: JWTPrincipal =
-                    call.principal<JWTPrincipal>() ?: throw ForbiddenException("Neplatný uživatel")
-                val userId: Long =
-                    principal.subject?.toLongOrNull()
-                        ?: throw ForbiddenException("Neplatný uživatel")
-                val role: String = principal[JwtService.CLAIM_ROLE] ?: ""
-                val companyId: Long? = principal[JwtService.CLAIM_COMPANY_ID]?.toLongOrNull()
-                call.respond(service.list(userId, role, companyId))
+                val ctx = call.callerContext()
+                call.respond(service.list(ctx.userId, ctx.role, ctx.companyId))
             }
 
             get("/{id}") {
@@ -59,14 +46,8 @@ public fun Route.ticketRoutes(service: TicketService) {
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::TicketId)
                         ?: throw BadRequestException("Neplatné id požadavku")
-                val principal: JWTPrincipal =
-                    call.principal<JWTPrincipal>() ?: throw ForbiddenException("Neplatný uživatel")
-                val userId: Long =
-                    principal.subject?.toLongOrNull()
-                        ?: throw ForbiddenException("Neplatný uživatel")
-                val role: String = principal[JwtService.CLAIM_ROLE] ?: ""
-                val companyId: Long? = principal[JwtService.CLAIM_COMPANY_ID]?.toLongOrNull()
-                call.respond(service.get(id, userId, role, companyId))
+                val ctx = call.callerContext()
+                call.respond(service.get(id, ctx.userId, ctx.role, ctx.companyId))
             }
 
             post("/{id}/assign") {
@@ -74,13 +55,9 @@ public fun Route.ticketRoutes(service: TicketService) {
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::TicketId)
                         ?: throw BadRequestException("Neplatné id požadavku")
-                val principal: JWTPrincipal =
-                    call.principal<JWTPrincipal>() ?: throw ForbiddenException("Neplatný uživatel")
-                val userId: Long =
-                    principal.subject?.toLongOrNull()
-                        ?: throw ForbiddenException("Neplatný uživatel")
+                val ctx = call.callerContext()
                 val req = call.receive<AssignRequest>()
-                call.respond(service.assign(id, userId, req))
+                call.respond(service.assign(id, ctx.userId, req))
             }
 
             post("/{id}/start") {
@@ -88,12 +65,8 @@ public fun Route.ticketRoutes(service: TicketService) {
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::TicketId)
                         ?: throw BadRequestException("Neplatné id požadavku")
-                val principal: JWTPrincipal =
-                    call.principal<JWTPrincipal>() ?: throw ForbiddenException("Neplatný uživatel")
-                val userId: Long =
-                    principal.subject?.toLongOrNull()
-                        ?: throw ForbiddenException("Neplatný uživatel")
-                call.respond(service.start(id, userId))
+                val ctx = call.callerContext()
+                call.respond(service.start(id, ctx.userId))
             }
 
             post("/{id}/resolve") {
@@ -101,13 +74,18 @@ public fun Route.ticketRoutes(service: TicketService) {
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::TicketId)
                         ?: throw BadRequestException("Neplatné id požadavku")
-                val principal: JWTPrincipal =
-                    call.principal<JWTPrincipal>() ?: throw ForbiddenException("Neplatný uživatel")
-                val userId: Long =
-                    principal.subject?.toLongOrNull()
-                        ?: throw ForbiddenException("Neplatný uživatel")
+                val ctx = call.callerContext()
                 val req = call.receive<ResolveRequest>()
-                call.respond(service.resolve(id, userId, req))
+                call.respond(service.resolve(id, ctx.userId, req))
+            }
+
+            post("/{id}/pdf") {
+                call.requireRole("client", "technician", "manager", "admin")
+                val id: Long =
+                    call.parameters["id"]?.toLongOrNull()
+                        ?: throw BadRequestException("Neplatné id tiketu")
+                val ctx = call.callerContext()
+                call.respond(HttpStatusCode.OK, service.pdfDocument(id, ctx.role, ctx.companyId, ctx.userId))
             }
         }
     }

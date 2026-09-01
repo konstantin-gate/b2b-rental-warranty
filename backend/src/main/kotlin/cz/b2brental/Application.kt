@@ -29,6 +29,7 @@ import cz.b2brental.utils.ApiException
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
@@ -67,12 +68,16 @@ public fun Application.module(config: Config = Config.fromEnv()) {
     val authService = AuthService(jwtService)
     val aiService = AiService(config.openaiApiKey)
 
+    monitor.subscribe(ApplicationStopping) {
+        aiService.close()
+    }
+
     val catalogService = CatalogService()
     val contractService = ContractService()
     val paymentService = PaymentService(Clock.systemDefaultZone())
     val ticketService = TicketService(aiService)
     val pdfService = PdfService()
-    val dashboardService = DashboardService(paymentService)
+    val dashboardService = DashboardService(paymentService, Clock.systemDefaultZone())
 
     install(ContentNegotiation) {
         json(

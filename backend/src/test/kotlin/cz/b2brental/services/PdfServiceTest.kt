@@ -23,18 +23,21 @@ import cz.b2brental.utils.NotFoundException
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insertAndGetId
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PdfServiceTest {
     private lateinit var pdfService: PdfService
+    private var contractId: Long = 0L
 
     @BeforeEach
     fun setUp() {
@@ -59,138 +62,82 @@ class PdfServiceTest {
                 Documents,
                 Notifications,
             )
+
+            val catId =
+                EquipmentCategories.insertAndGetId {
+                    it[name] = "Chladicí vitrína"
+                    it[icon] = "❄️"
+                }
+            val eqId =
+                Equipment.insertAndGetId {
+                    it[categoryId] = catId
+                    it[model] = "CoolMax 3000"
+                    it[serialNumber] = "SN-12345"
+                    it[price] = BigDecimal("50000.00")
+                    it[monthlyRate] = BigDecimal("4500.00")
+                    it[status] = EquipmentStatus.available
+                }
+            val compId =
+                Companies.insertAndGetId {
+                    it[name] = "Test s.r.o."
+                    it[inn] = "28745001"
+                    it[address] = "Praha 1"
+                }
+            contractId =
+                RentalContracts
+                    .insertAndGetId {
+                        it[companyId] = compId
+                        it[startDate] = LocalDate.parse("2026-01-01")
+                        it[endDate] = LocalDate.parse("2026-12-31")
+                        it[months] = 12
+                        it[monthlyAmount] = BigDecimal("4500.00")
+                        it[deposit] = BigDecimal("1350.00")
+                        it[totalAmount] = BigDecimal("55350.00")
+                        it[status] = ContractStatus.active
+                        it[deliveryAddress] = "Praha 5, Revoluční 1082/8"
+                    }.value
+
+            ContractItems.insertAndGetId {
+                it[contractId] = this@PdfServiceTest.contractId
+                it[equipmentId] = eqId.value
+            }
         }
         pdfService = PdfService()
     }
 
     @Test
     fun rentalContractPdfTest() {
-        val contractId =
-            transaction {
-                val catId =
-                    EquipmentCategories.insertAndGetId {
-                        it[name] = "Chladicí vitrína"
-                        it[icon] = "❄️"
-                    }
-                val eqId =
-                    Equipment.insertAndGetId {
-                        it[categoryId] = catId
-                        it[model] = "CoolMax 3000"
-                        it[serialNumber] = "SN-12345"
-                        it[price] = BigDecimal("50000.00")
-                        it[monthlyRate] = BigDecimal("4500.00")
-                        it[status] = EquipmentStatus.available
-                    }
-                val compId =
-                    Companies.insertAndGetId {
-                        it[name] = "Test s.r.o."
-                        it[inn] = "28745001"
-                        it[address] = "Praha 1"
-                    }
-                val cId =
-                    RentalContracts
-                        .insertAndGetId {
-                            it[companyId] = compId
-                            it[startDate] = LocalDate.parse("2026-01-01")
-                            it[endDate] = LocalDate.parse("2026-12-31")
-                            it[months] = 12
-                            it[monthlyAmount] = BigDecimal("4500.00")
-                            it[deposit] = BigDecimal("1350.00")
-                            it[totalAmount] = BigDecimal("55350.00")
-                            it[status] = ContractStatus.active
-                            it[deliveryAddress] = "Praha 5, Revoluční 1082/8"
-                        }.value
-                ContractItems.insertAndGetId {
-                    it[contractId] = cId
-                    it[equipmentId] = eqId.value
-                }
-                cId
-            }
-
         val bytes = pdfService.render(DocumentType.rental_contract, contractId)
         assertNotNull(bytes)
         assertTrue(bytes.size > 100)
-        val header = String(bytes, 0, minOf(5, bytes.size))
-        assertTrue(header.startsWith("%PDF"))
+        assertEquals("%PDF-", String(bytes, 0, 5))
     }
 
     @Test
     fun acceptanceActPdfTest() {
-        val equipmentId =
-            transaction {
-                val catId =
-                    EquipmentCategories.insertAndGetId {
-                        it[name] = "Chladicí vitrína"
-                        it[icon] = "❄️"
-                    }
-                Equipment
-                    .insertAndGetId {
-                        it[categoryId] = catId
-                        it[model] = "CoolMax 3000"
-                        it[serialNumber] = "SN-12345"
-                        it[price] = BigDecimal("50000.00")
-                        it[monthlyRate] = BigDecimal("4500.00")
-                        it[status] = EquipmentStatus.available
-                    }.value
-            }
-
-        val bytes = pdfService.render(DocumentType.acceptance_act, equipmentId)
+        val bytes = pdfService.render(DocumentType.acceptance_act, contractId)
         assertNotNull(bytes)
         assertTrue(bytes.size > 100)
+        assertEquals("%PDF-", String(bytes, 0, 5))
     }
 
     @Test
     fun returnActPdfTest() {
-        val equipmentId =
-            transaction {
-                val catId =
-                    EquipmentCategories.insertAndGetId {
-                        it[name] = "Chladicí vitrína"
-                        it[icon] = "❄️"
-                    }
-                Equipment
-                    .insertAndGetId {
-                        it[categoryId] = catId
-                        it[model] = "CoolMax 3000"
-                        it[serialNumber] = "SN-12345"
-                        it[price] = BigDecimal("50000.00")
-                        it[monthlyRate] = BigDecimal("4500.00")
-                        it[status] = EquipmentStatus.rented
-                    }.value
-            }
-
-        val bytes = pdfService.render(DocumentType.return_act, equipmentId)
+        val bytes = pdfService.render(DocumentType.return_act, contractId)
         assertNotNull(bytes)
         assertTrue(bytes.size > 100)
+        assertEquals("%PDF-", String(bytes, 0, 5))
     }
 
     @Test
     fun serviceReportPdfTest() {
         val ticketId =
             transaction {
-                val catId =
-                    EquipmentCategories.insertAndGetId {
-                        it[name] = "Chladicí vitrína"
-                        it[icon] = "❄️"
-                    }
-                val eqId =
-                    Equipment.insertAndGetId {
-                        it[categoryId] = catId
-                        it[model] = "CoolMax 3000"
-                        it[serialNumber] = "SN-12345"
-                        it[price] = BigDecimal("50000.00")
-                        it[monthlyRate] = BigDecimal("4500.00")
-                        it[status] = EquipmentStatus.rented
-                    }
-                val compId =
-                    Companies.insertAndGetId {
-                        it[name] = "Test s.r.o."
-                        it[inn] = "28745001"
-                        it[address] = "Praha 1"
-                    }
+                val comp = Companies.selectAll().first()
+                val eq = Equipment.selectAll().first()
                 val userId =
                     Users.insertAndGetId {
-                        it[companyId] = compId
+                        it[companyId] = comp[Companies.id]
                         it[email] = "tech@b2b.demo"
                         it[passwordHash] = "hash"
                         it[role] = "technician"
@@ -198,8 +145,8 @@ class PdfServiceTest {
                     }
                 ServiceTickets
                     .insertAndGetId {
-                        it[equipmentId] = eqId
-                        it[companyId] = compId
+                        it[equipmentId] = eq[Equipment.id]
+                        it[companyId] = comp[Companies.id]
                         it[description] = "Kompresor hučí"
                         it[severity] = cz.b2brental.db.Severity.medium
                         it[warrantyVerdict] = cz.b2brental.db.WarrantyVerdict.covered
@@ -214,33 +161,16 @@ class PdfServiceTest {
         val bytes = pdfService.render(DocumentType.service_report, ticketId)
         assertNotNull(bytes)
         assertTrue(bytes.size > 100)
+        assertEquals("%PDF-", String(bytes, 0, 5))
     }
 
     @Test
     fun invoicePdfTest() {
         val paymentId =
             transaction {
-                val compId =
-                    Companies.insertAndGetId {
-                        it[name] = "Test s.r.o."
-                        it[inn] = "28745001"
-                        it[address] = "Praha 1"
-                    }
-                val rentalContractId =
-                    RentalContracts.insertAndGetId {
-                        it[companyId] = compId
-                        it[startDate] = LocalDate.parse("2026-01-01")
-                        it[endDate] = LocalDate.parse("2026-12-31")
-                        it[months] = 12
-                        it[monthlyAmount] = BigDecimal("4500.00")
-                        it[deposit] = BigDecimal("1350.00")
-                        it[totalAmount] = BigDecimal("55350.00")
-                        it[status] = ContractStatus.active
-                        it[deliveryAddress] = "Praha 5"
-                    }
                 Payments
                     .insertAndGetId {
-                        it[contractId] = rentalContractId.value
+                        it[contractId] = this@PdfServiceTest.contractId
                         it[period] = 1
                         it[amount] = BigDecimal("4500.00")
                         it[dueDate] = LocalDate.parse("2026-02-01")
@@ -251,10 +181,11 @@ class PdfServiceTest {
         val bytes = pdfService.render(DocumentType.invoice, paymentId)
         assertNotNull(bytes)
         assertTrue(bytes.size > 100)
+        assertEquals("%PDF-", String(bytes, 0, 5))
     }
 
     @Test
-    fun rentalContractNotFoundTest() {
+    fun notFoundPdfTest() {
         assertFailsWith<NotFoundException> {
             pdfService.render(DocumentType.rental_contract, 99999L)
         }

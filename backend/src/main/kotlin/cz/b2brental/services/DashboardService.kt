@@ -20,12 +20,13 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
+import java.time.Clock
 import java.time.LocalDate
-import java.time.ZoneOffset
 
 /** Služba metrik dashboardu pro manažera/admina */
 public class DashboardService(
     private val paymentService: PaymentService,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) {
     /** Vypočte metriky napříč systémem pomocí SQL agregací v jedné transakci */
     public fun metrics(): DashboardMetrics {
@@ -69,10 +70,10 @@ public class DashboardService(
 
             val startOfMonthInstant =
                 LocalDate
-                    .now()
+                    .now(clock)
                     .withDayOfMonth(1)
-                    .atStartOfDay()
-                    .toInstant(ZoneOffset.UTC)
+                    .atStartOfDay(clock.zone)
+                    .toInstant()
 
             val newContracts =
                 RentalContracts
