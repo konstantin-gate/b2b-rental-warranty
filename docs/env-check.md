@@ -24,3 +24,17 @@ nothing added to commit but untracked files present (`.playwright-mcp/`)
 
 - Gradle chybí — požadována instalace: `brew install gradle`
 - Po instalaci bude pokračovat kroku A.2 (generování wrapperu)
+
+## Kontrola Android prostředí (Fáze 3)
+
+**Datum kontroly:** 2026-09-02
+
+| Nástroj | Cesta / Verze | Stav |
+|---|---|---|
+| Android SDK | `~/Library/Android/sdk` | ✅ nainstalován |
+| build-tools | 36.0.0 | ✅ |
+| platforms | android-37.0 | ✅ |
+| platform-tools (adb) | přítomny | ✅ |
+| Emulátor / zařízení | — | ❌ nenalezen |
+
+**Režim UI kontrol:** Emulátor ani připojené zařízení nebylo nalezeno. UI kontrola probíhá pouze přes `./gradlew assembleDebug` (sestavení APK) a `./gradlew test` (jednotkové testy ViewModel). Manuální ověření na emulátoru bude provedeno, pokud bude emulátor k dispozici v průběhu práce.

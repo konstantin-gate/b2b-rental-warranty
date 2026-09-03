@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">B2B Rental</string>
+
+    <!-- Obecné -->
+    <string name="common_loading">Načítání…</string>
+    <string name="common_error">Chyba</string>
+    <string name="common_retry">Opakovat</string>
+    <string name="common_cancel">Zrušit</string>
+    <string name="common_confirm">Potvrdit</string>
+    <string name="common_save">Uložit</string>
+    <string name="common_delete">Smazat</string>
+    <string name="common_close">Zavřít</string>
+    <string name="common_back">Zpět</string>
+    <string name="common_offline">Offline režim – data z cache</string>
+    <string name="common_empty">Žádná data</string>
+    <string name="menu_logout">Odhlásit se</string>
+
+    <!-- Přihlášení -->
+    <string name="auth_login_title">Přihlášení</string>
+    <string name="auth_login_email">E-mail</string>
+    <string name="auth_login_password">Heslo</string>
+    <string name="auth_login_submit">Přihlásit se</string>
+    <string name="auth_login_submit_description">Přihlásit se</string>
+    <string name="auth_login_register">Registrovat firmu</string>
+    <string name="auth_login_error">Neplatné přihlašovací údaje</string>
+    <string name="auth_login_error_empty">Vyplňte e-mail i heslo</string>
+    <string name="auth_login_error_unknown">Neočekávaná chyba</string>
+
+    <!-- Registrace -->
+    <string name="auth_register_title">Registrace firmy</string>
+    <string name="auth_register_company_name">Název firmy</string>
+    <string name="auth_register_inn">IČO (8 čísel)</string>
+    <string name="auth_register_address">Adresa</string>
+    <string name="auth_register_email">E-mail administrátora</string>
+    <string name="auth_register_password">Heslo (min. 6 znaků)</string>
+    <string name="auth_register_phone">Telefon (nepovinné, +420…)</string>
+    <string name="auth_register_submit">Registrovat</string>
+    <string name="auth_register_login">Zpět na přihlášení</string>
+    <string name="auth_register_error_inn">Neplatné IČO</string>
+    <string name="auth_register_error_phone">Neplatný formát telefonu</string>
+    <string name="auth_register_error_password">Heslo musí mít alespoň 6 znaků</string>
+    <string name="auth_register_error_email">Neplatný formát e-mailu</string>
+    <string name="auth_register_error_email_empty">Vyplňte e-mail administrátora</string>
+    <string name="auth_register_error_unknown">Neočekávaná chyba</string>
+
+    <!-- Katalog -->
+    <string name="catalog_title">Katalog</string>
+    <string name="catalog_filter_all">Vše</string>
+    <string name="catalog_create_contract">Vytvořit smlouvu</string>
+    <string name="catalog_add_to_selection">Přidat do výběru</string>
+    <string name="catalog_status_available">Dostupné</string>
+    <string name="catalog_status_rented">Pronajato</string>
+    <string name="catalog_status_maintenance">Údržba</string>
+
+    <!-- Detail vybavení -->
+    <string name="equipment_detail_title">Detail vybavení</string>
+    <string name="equipment_detail_model">Model</string>
+    <string name="equipment_detail_serial">Výrobní číslo</string>
+    <string name="equipment_detail_category">Kategorie</string>
+    <string name="equipment_detail_price">Cena</string>
+    <string name="equipment_detail_monthly_rate">Měsíční sazba</string>
+    <string name="equipment_detail_status">Stav</string>
+    <string name="equipment_detail_description">Popis</string>
+
+    <!-- Smlouvy -->
+    <string name="contracts_title">Smlouvy</string>
+    <string name="contract_new_title">Nová smlouva</string>
+    <string name="contract_new_months">Počet měsíců (1–36)</string>
+    <string name="contract_new_start_date">Datum zahájení</string>
+    <string name="contract_new_delivery_address">Adresa dodání</string>
+    <string name="contract_new_preview">Předběžný výpočet</string>
+    <string name="contract_new_submit">Vytvořit smlouvu</string>
+    <string name="contract_detail_title">Detail smlouvy</string>
+    <string name="contract_approve">Schválit</string>
+    <string name="contract_reject">Zamítnout</string>
+    <string name="contract_pdf">Stáhnout PDF</string>
+    <string name="contract_status_draft">Koncept</string>
+    <string name="contract_status_active">Aktivní</string>
+    <string name="contract_status_approved">Schváleno</string>
+    <string name="contract_status_rejected">Zamítnuto</string>
+
+    <!-- Moje vybavení -->
+    <string name="my_equipment_title">Moje vybavení</string>
+    <string name="equipment_serial">Sériové číslo</string>
+    <string name="equipment_serial_unknown">N/A</string>
+    <string name="report_issue_title">Nahlásit poruchu</string>
+
+    <!-- Hlášení poruchy -->
+    <string name="report_issue_description">Popis poruchy (min. 10 znaků)</string>
+    <string name="report_take_photo">Vyfotit</string>
+    <string name="report_choose_photo">Vybrat z galerie</string>
+    <string name="report_send">Odeslat hlášení</string>
+    <string name="report_severity">Závažnost</string>
+    <string name="report_warranty_verdict">Verdikt záruky</string>
+    <string name="report_warranty_reason">Důvod</string>
+    <string name="report_ai_recommendation">Doporučení AI</string>
+
+    <!-- Ticketky -->
+    <string name="tickets_title">Moje hlášení</string>
+    <string name="ticket_detail_title">Detail hlášení</string>
+    <string name="ticket_assign">Přiřadit technika</string>
+    <string name="ticket_start">Zahájit opravu</string>
+    <string name="ticket_resolve">Vyřešit</string>
+    <string name="ticket_resolution_repaired">Opraveno</string>
+    <string name="ticket_resolution_replaced">Vyměněno</string>
+    <string name="ticket_resolution_not_covered">Nekryto zárukou</string>
+    <string name="ticket_notes">Poznámky</string>
+    <string name="ticket_submit_resolve">Odeslat řešení</string>
+    <string name="ticket_open_report">Otevřít report</string>
+
+    <!-- Platby -->
+    <string name="payments_title">Platby</string>
+    <string name="payment_pay">Zaplatit</string>
+    <string name="payment_status_paid">Zaplaceno</string>
+    <string name="payment_status_unpaid">Nezaplaceno</string>
+    <string name="payment_status_overdue">Po splatnosti</string>
+
+    <!-- Dashboard (Manager/Admin) -->
+    <string name="dashboard_title">Přehled</string>
+    <string name="dashboard_active_contracts">Aktivní smlouvy</string>
+    <string name="dashboard_open_tickets">Otevřená hlášení</string>
+    <string name="dashboard_overdue_payments">Po splatnosti</string>
+    <string name="dashboard_equipment">Stav vybavení</string>
+    <string name="dashboard_month_stats">Statistiky měsíce</string>
+    <string name="dashboard_assistant">AI Asistent</string>
+
+    <!-- AI Asistent -->
+    <string name="assistant_title">AI Asistent</string>
+    <string name="assistant_input">Zeptejte se…</string>
+    <string name="assistant_send">Odeslat</string>
+
+    <!-- Admin katalog -->
+    <string name="admin_catalog_title">Správa katalogu</string>
+    <string name="admin_catalog_create">Vytvořit vybavení</string>
+    <string name="admin_catalog_edit">Upravit vybavení</string>
+    <string name="admin_catalog_delete">Smazat</string>
+    <string name="admin_catalog_category_id">ID kategorie (1–4)</string>
+    <string name="admin_catalog_model">Model</string>
+    <string name="admin_catalog_serial_number">Výrobní číslo</string>
+    <string name="admin_catalog_price">Cena</string>
+    <string name="admin_catalog_monthly_rate">Měsíční sazba</string>
+    <string name="admin_catalog_description">Popis</string>
+    <string name="admin_catalog_photo_url">URL fotografie</string>
+    <string name="admin_catalog_confirm_delete">Opravdu smazat toto vybavení?</string>
+
+    <!-- PDF prohlížeč -->
+    <string name="pdf_viewer_title">PDF dokument</string>
+    <string name="pdf_viewer_no_app">Není nainstalován prohlížeč PDF</string>
+    <string name="pdf_viewer_chooser_title">Otevřít PDF</string>
+    <string name="pdf_viewer_downloaded">PDF bylo staženo – otevřete v prohlížeči</string>
+
+    <!-- Chyby -->
+    <string name="error_offline">Backend není dostupný</string>
+    <string name="error_unauthorized">Neplatné přihlašovací údaje</string>
+    <string name="error_empty_date">Vyberte datum zahájení</string>
+    <string name="error_empty_address">Zadejte adresu dodání</string>
+    <string name="error_rates_load_failed">Chyba při načítání sazeb</string>
+    <string name="error_contract_create_failed">Chyba při vytváření smlouvy</string>
+    <string name="error_contract_list_load_failed">Chyba při načítání smluv</string>
+    <string name="error_contract_detail_load_failed">Chyba při načítání smlouvy</string>
+    <string name="error_contract_approve_failed">Chyba při schvalování</string>
+    <string name="error_contract_reject_failed">Chyba při zamítání</string>
+    <string name="error_contract_pdf_failed">Chyba při stahování PDF</string>
+    <string name="error_catalog_load_failed">Chyba při načítání katalogu</string>
+    <string name="error_equipment_detail_load_failed">Chyba při načítání vybavení</string>
+    <string name="error_my_equipment_load_failed">Chyba při načítání vybavení</string>
+    <string name="error_pdf_download_failed">Chyba při stahování PDF</string>
+    <string name="error_unknown">Neočekávaná chyba</string>
+
+    <!-- Nová smlouva – detaily -->
+    <string name="contract_new_preview_note">Přesné částky potvrdí server</string>
+    <string name="contract_new_pick_date">Vybrat datum</string>
+    <string name="contract_new_monthly_label">Měsíčně</string>
+    <string name="contract_new_deposit_label">Depozit</string>
+    <string name="contract_new_total_label">Celkem</string>
+    <string name="contract_new_preview_empty">Zadejte měsíce a datum pro výpočet</string>
+
+    <!-- Detail smlouvy -->
+    <string name="contract_detail_status_label">Stav:</string>
+    <string name="contract_detail_period_label">Období:</string>
+    <string name="contract_detail_months_label">Měsíců:</string>
+    <string name="contract_detail_amounts_title">Částky</string>
+    <string name="contract_detail_delivery_title">Adresa dodání</string>
+    <string name="contract_detail_items_title">Položky</string>
+    <string name="contract_card_monthly_label">Měsíčně:</string>
+    <string name="contract_card_deposit_label">Depozit:</string>
+    <string name="contract_card_total_label">Celkem:</string>
+
+    <!-- Navigace -->
+    <string name="nav_catalog">Katalog</string>
+    <string name="nav_contracts">Smlouvy</string>
+    <string name="nav_my_equipment">Vybavení</string>
+    <string name="nav_tickets">Hlášení</string>
+    <string name="nav_payments">Platby</string>
+    <string name="nav_dashboard">Přehled</string>
+    <string name="nav_assistant">Asistent</string>
+</resources>
