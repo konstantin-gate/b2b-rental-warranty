@@ -37,6 +37,24 @@ public enum class ErrorType {
     PDF_NO_APP,
     /** Stažení PDF selhalo. */
     PDF_DOWNLOAD_FAILED,
+    /** Uživatel nezadal popis poruchy. */
+    EMPTY_DESCRIPTION,
+    /** Popis poruchy je kratší než 10 znaků. */
+    DESCRIPTION_TOO_SHORT,
+    /** Zpracování (zmenšení/kódování) fotografie selhalo. */
+    PHOTO_ENCODE_FAILED,
+    /** Odeslání servisního hlášení na backend selhalo. */
+    TICKET_CREATE_FAILED,
+    /** Načtení seznamu hlášení selhalo. */
+    TICKETS_LOAD_FAILED,
+    /** Načtení detailu hlášení selhalo. */
+    TICKET_DETAIL_LOAD_FAILED,
+    /** Načtení seznamu plateb selhalo. */
+    PAYMENTS_LOAD_FAILED,
+    /** Zpracování platby selhalo. */
+    PAYMENT_PAY_FAILED,
+    /** Platba již byla dříve uhrazena (HTTP 409). */
+    PAYMENT_ALREADY_PAID,
     /** Jakákoliv jiná (neočekávaná) chyba. */
     UNKNOWN,
 }

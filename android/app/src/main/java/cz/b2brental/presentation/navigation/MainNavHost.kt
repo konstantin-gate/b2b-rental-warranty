@@ -21,6 +21,14 @@ import cz.b2brental.presentation.feature.contract.ContractsScreen
 import cz.b2brental.presentation.feature.contract.CreateContractScreen
 import cz.b2brental.presentation.feature.document.PdfViewerScreen
 import cz.b2brental.presentation.feature.equipment.MyEquipmentScreen
+import cz.b2brental.presentation.feature.payment.PaymentsScreen
+import cz.b2brental.presentation.feature.payment.PaymentsViewModel
+import cz.b2brental.presentation.feature.ticket.ReportIssueScreen
+import cz.b2brental.presentation.feature.ticket.ReportIssueViewModel
+import cz.b2brental.presentation.feature.ticket.TicketDetailScreen
+import cz.b2brental.presentation.feature.ticket.TicketDetailViewModel
+import cz.b2brental.presentation.feature.ticket.TicketsScreen
+import cz.b2brental.presentation.feature.ticket.TicketsViewModel
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -103,22 +111,49 @@ public fun MainNavHost(
         }
         composable(Routes.MY_EQUIPMENT) {
             val viewModel = koinViewModel<cz.b2brental.presentation.feature.equipment.MyEquipmentViewModel>()
-            MyEquipmentScreen(viewModel = viewModel)
+            MyEquipmentScreen(
+                viewModel = viewModel,
+                onReportIssueClick = { equipmentId ->
+                    navController.navigate(Routes.reportIssue(equipmentId))
+                },
+            )
         }
-        composable(Routes.REPORT_ISSUE) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Hlášení poruchy (bude v C.2)")
-            }
+        composable(
+            route = Routes.REPORT_ISSUE,
+            arguments = listOf(navArgument("equipmentId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val equipmentId = backStackEntry.arguments?.getLong("equipmentId") ?: return@composable
+            val viewModel = koinViewModel<ReportIssueViewModel>()
+            ReportIssueScreen(
+                equipmentId = equipmentId,
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToTickets = {
+                    navController.navigate(Routes.TICKETS) {
+                        popUpTo(Routes.REPORT_ISSUE) { inclusive = true }
+                    }
+                },
+            )
         }
         composable(Routes.TICKETS) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Moje hlášení (bude v C.3)")
-            }
+            val viewModel = koinViewModel<TicketsViewModel>()
+            TicketsScreen(
+                viewModel = viewModel,
+                onTicketClick = { ticketId -> navController.navigate(Routes.ticketDetail(ticketId)) },
+            )
         }
-        composable(Routes.TICKET_DETAIL) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Detail hlášení (bude v C.3)")
-            }
+        composable(
+            route = Routes.TICKET_DETAIL,
+            arguments = listOf(navArgument("ticketId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val ticketId = backStackEntry.arguments?.getLong("ticketId") ?: return@composable
+            val viewModel = koinViewModel<TicketDetailViewModel>()
+            TicketDetailScreen(
+                ticketId = ticketId,
+                profile = profile,
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
         }
         composable(Routes.TICKET_RESOLVE) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -126,9 +161,8 @@ public fun MainNavHost(
             }
         }
         composable(Routes.PAYMENTS) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Platby (bude v C.4)")
-            }
+            val viewModel = koinViewModel<PaymentsViewModel>()
+            PaymentsScreen(viewModel = viewModel)
         }
         composable(Routes.DASHBOARD) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

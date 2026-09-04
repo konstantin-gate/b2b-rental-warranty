@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,11 +31,13 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 /**
  * Obrazovka „Moje vybavení" — zobrazí vybavení z aktivních smluv.
  * @param viewModel ViewModel vybavení
+ * @param onReportIssueClick callback přechodu na hlášení poruchy pro dané vybavení
  */
 @Suppress("KDocMissingDocumentation")
 @Composable
 public fun MyEquipmentScreen(
     viewModel: MyEquipmentViewModel,
+    onReportIssueClick: (Long) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -64,7 +67,10 @@ public fun MyEquipmentScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(uiState.items, key = { it.equipmentId }) { item ->
-                        EquipmentCard(item = item)
+                        EquipmentCard(
+                            item = item,
+                            onReportIssue = { onReportIssueClick(item.equipmentId) },
+                        )
                     }
                 }
             }
@@ -73,11 +79,12 @@ public fun MyEquipmentScreen(
 }
 
 /**
- * Karta vybavení — zobrazí model a sériové číslo.
+ * Karta vybavení — zobrazí model, sériové číslo a tlačítko pro nahlášení poruchy.
  * @param item data vybavení
+ * @param onReportIssue callback nahlášení poruchy pro dané vybavení
  */
 @Composable
-private fun EquipmentCard(item: MyEquipmentItem) {
+private fun EquipmentCard(item: MyEquipmentItem, onReportIssue: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -108,6 +115,15 @@ private fun EquipmentCard(item: MyEquipmentItem) {
                     text = item.serialNumber ?: stringResource(R.string.equipment_serial_unknown),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = onReportIssue,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.report_issue_title))
             }
         }
     }

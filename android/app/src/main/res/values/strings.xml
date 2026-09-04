@@ -195,4 +195,48 @@
     <string name="nav_payments">Platby</string>
     <string name="nav_dashboard">Přehled</string>
     <string name="nav_assistant">Asistent</string>
+
+    <!-- Část 3-C: hlášení poruchy -->
+    <string name="error_empty_description">Zadejte popis poruchy</string>
+    <string name="error_description_too_short">Popis poruchy musí mít alespoň 10 znaků</string>
+    <string name="error_photo_encode_failed">Nepodařilo se zpracovat fotografii</string>
+    <string name="error_ticket_create_failed">Chyba při odesílání hlášení</string>
+    <string name="ticket_dialog_ai_title">Výsledek AI diagnostiky</string>
+    <string name="ticket_dialog_button_ok">Rozumím</string>
+    <string name="ticket_photo_attached">Fotografie byla přiložena</string>
+    <string name="ticket_photo_delete">Odstranit foto</string>
+    <string name="ticket_photo_not_available">Fotografie není k dispozici</string>
+
+    <!-- Část 3-C: seznam a detail tiketů -->
+    <string name="error_tickets_load_failed">Chyba při načítání hlášení</string>
+    <string name="error_ticket_detail_load_failed">Chyba při načítání detailu hlášení</string>
+    <string name="ticket_filter_all">Vše</string>
+    <string name="ticket_no">Hlášení č. %1$d</string>
+    <string name="ticket_company_label">Společnost: %1$s</string>
+    <string name="ticket_equipment_label">Vybavení: %1$s</string>
+    <string name="ticket_created_at_label">Vytvořeno: %1$s</string>
+    <string name="ticket_status_label">Stav: %1$s</string>
+    <string name="ticket_warranty_reason_label">Důvod: %1$s</string>
+    <string name="ticket_actions_hint">Akce technika budou dostupné v další etapě</string>
+    <string name="ticket_status_new">Nové</string>
+    <string name="ticket_status_assigned">Přiřazeno</string>
+    <string name="ticket_status_in_progress">V řešení</string>
+    <string name="ticket_status_resolved">Vyřešeno</string>
+    <string name="ticket_status_rejected">Zamítnuto</string>
+    <string name="severity_low">Nízká</string>
+    <string name="severity_medium">Střední</string>
+    <string name="severity_critical">Kritická</string>
+    <string name="severity_none">Neurčeno</string>
+    <string name="verdict_covered">Kryto zárukou</string>
+    <string name="verdict_not_covered">Nekryto zárukou</string>
+    <string name="verdict_review_required">K ručnímu posouzení</string>
+    <string name="verdict_none">Neurčeno</string>
+
+    <!-- Část 3-C: platby -->
+    <string name="error_payments_load_failed">Chyba při načítání plateb</string>
+    <string name="error_payment_pay_failed">Chyba při zpracování platby</string>
+    <string name="error_payment_already_paid">Tato platba již byla uhrazena</string>
+    <string name="payment_period_label">Období %1$d</string>
+    <string name="payment_due_date_label">Splatnost: %1$s</string>
+    <string name="payment_paid_at_label">Zaplaceno: %1$s</string>
 </resources>

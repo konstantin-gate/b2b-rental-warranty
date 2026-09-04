@@ -19,6 +19,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        @Suppress("HardCodedStringLiteral")
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8090/\"")
     }
 
@@ -26,7 +27,9 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(
+                @Suppress("HardCodedStringLiteral")
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                @Suppress("HardCodedStringLiteral")
                 "proguard-rules.pro"
             )
         }
@@ -47,6 +50,7 @@ android {
     }
 
     ksp {
+        @Suppress("HardCodedStringLiteral")
         arg("room.schemaLocation", "$projectDir/schemas")
     }
 }
@@ -94,6 +98,9 @@ dependencies {
 
     // Coil (načítání obrázků)
     implementation(libs.coil.compose)
+
+    // EXIF (zpracování orientace fotografie poruchy)
+    implementation(libs.androidx.exifinterface)
 
     // Unit tests
     testImplementation(libs.junit)
