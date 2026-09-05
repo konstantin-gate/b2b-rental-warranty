@@ -10,13 +10,19 @@ import cz.b2brental.data.remote.createB2bHttpClient
 import cz.b2brental.data.repository.AuthRepositoryImpl
 import cz.b2brental.data.repository.CatalogRepositoryImpl
 import cz.b2brental.data.repository.ContractRepositoryImpl
+import cz.b2brental.data.repository.DashboardRepositoryImpl
+import cz.b2brental.data.repository.AiRepositoryImpl
 import cz.b2brental.data.repository.PaymentRepositoryImpl
 import cz.b2brental.data.repository.TicketRepositoryImpl
+import cz.b2brental.data.repository.UserRepositoryImpl
+import cz.b2brental.domain.repository.AiRepository
 import cz.b2brental.domain.repository.AuthRepository
 import cz.b2brental.domain.repository.CatalogRepository
 import cz.b2brental.domain.repository.ContractRepository
+import cz.b2brental.domain.repository.DashboardRepository
 import cz.b2brental.domain.repository.PaymentRepository
 import cz.b2brental.domain.repository.TicketRepository
+import cz.b2brental.domain.repository.UserRepository
 import cz.b2brental.domain.util.DefaultPhotoEncoder
 import cz.b2brental.domain.util.PhotoEncoder
 import cz.b2brental.presentation.SessionViewModel
@@ -27,10 +33,14 @@ import cz.b2brental.presentation.feature.catalog.EquipmentDetailViewModel
 import cz.b2brental.presentation.feature.contract.ContractDetailViewModel
 import cz.b2brental.presentation.feature.contract.ContractsViewModel
 import cz.b2brental.presentation.feature.contract.CreateContractViewModel
+import cz.b2brental.presentation.feature.admin.AdminCatalogViewModel
+import cz.b2brental.presentation.feature.assistant.AssistantViewModel
+import cz.b2brental.presentation.feature.dashboard.DashboardViewModel
 import cz.b2brental.presentation.feature.document.PdfViewerViewModel
 import cz.b2brental.presentation.feature.equipment.MyEquipmentViewModel
 import cz.b2brental.presentation.feature.payment.PaymentsViewModel
 import cz.b2brental.presentation.feature.ticket.ReportIssueViewModel
+import cz.b2brental.presentation.feature.ticket.ResolveTicketViewModel
 import cz.b2brental.presentation.feature.ticket.TicketDetailViewModel
 import cz.b2brental.presentation.feature.ticket.TicketsViewModel
 import org.koin.android.ext.koin.androidContext
@@ -61,6 +71,9 @@ public val repositoryModule: Module = module {
     single<ContractRepository> { ContractRepositoryImpl(get()) }
     single<TicketRepository> { TicketRepositoryImpl(get()) }
     single<PaymentRepository> { PaymentRepositoryImpl(get()) }
+    single<DashboardRepository> { DashboardRepositoryImpl(get()) }
+    single<AiRepository> { AiRepositoryImpl(get()) }
+    single<UserRepository> { UserRepositoryImpl(get()) }
 }
 
 /**
@@ -80,5 +93,9 @@ public val viewModelModule: Module = module {
     viewModelOf(::ReportIssueViewModel)
     viewModelOf(::TicketsViewModel)
     viewModelOf(::TicketDetailViewModel)
+    viewModelOf(::ResolveTicketViewModel)
     viewModelOf(::PaymentsViewModel)
+    viewModelOf(::DashboardViewModel)
+    viewModelOf(::AssistantViewModel)
+    viewModelOf(::AdminCatalogViewModel)
 }

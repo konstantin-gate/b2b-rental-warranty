@@ -19,13 +19,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +56,7 @@ import cz.b2brental.presentation.components.LoadingIndicator
  * @param profile profil přihlášeného uživatele (pro role-based akce)
  * @param viewModel ViewModel detailu
  * @param onNavigateBack callback návratu
+ * @param onNavigateToResolve callback přechodu na obrazovku vyřešení tiketu
  */
 @Suppress("KDocMissingDocumentation")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,6 +66,7 @@ public fun TicketDetailScreen(
     profile: UserProfile,
     viewModel: TicketDetailViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToResolve: (Long) -> Unit,
 ) {
     LaunchedEffect(ticketId) { viewModel.loadTicket(ticketId) }
     val uiState by viewModel.uiState.collectAsState()
@@ -103,21 +107,85 @@ public fun TicketDetailScreen(
             when {
                 uiState.isLoading -> LoadingIndicator()
                 uiState.ticket == null -> EmptyState()
-                else -> uiState.ticket?.let { ticket ->
-                    TicketDetailContent(ticket = ticket, profile = profile)
+                else -> {
+                    val ticket = uiState.ticket ?: return@Column
+                    TicketDetailContent(
+                        ticket = ticket,
+                        profile = profile,
+                        uiState = uiState,
+                        onAssignClick = { viewModel.loadTechnicians() },
+                        onStartClick = { viewModel.startWork() },
+                        onResolveClick = { onNavigateToResolve(ticket.id) },
+                    )
                 }
             }
         }
     }
+
+    if (uiState.showAssignDialog) {
+        AssignTechnicianDialog(
+            technicians = uiState.technicians,
+            onDismiss = { viewModel.dismissAssignDialog() },
+            onSelect = { technicianId -> viewModel.assignTechnician(technicianId) },
+        )
+    }
+}
+
+/**
+ * Dialog pro výběr technika k přiřazení.
+ * @param technicians seznam techniků
+ * @param onDismiss callback zavření dialogu
+ * @param onSelect callback výběru technika
+ */
+@Composable
+private fun AssignTechnicianDialog(
+    technicians: List<cz.b2brental.data.remote.dto.TechnicianResponseDto>,
+    onDismiss: () -> Unit,
+    onSelect: (Long) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.assign_dialog_title)) },
+        text = {
+            if (technicians.isEmpty()) {
+                Text(stringResource(R.string.technicians_empty))
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    technicians.forEach { technician ->
+                        val phoneSuffix: String = technician.phone?.let { " · $it" } ?: ""
+                        TextButton(onClick = { onSelect(technician.id) }) {
+                            Text(technician.email + phoneSuffix)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        },
+    )
 }
 
 /**
  * Obsah detailu tiketu — karty, fotografie, AI diagnostika, akce.
  * @param ticket data tiketu
  * @param profile profil přihlášeného uživatele
+ * @param uiState aktuální UI stav (pro isActionInProgress)
+ * @param onAssignClick callback tlačítka «Přiřadit technika»
+ * @param onStartClick callback tlačítka «Zahájit opravu»
+ * @param onResolveClick callback tlačítka «Vyřešit»
  */
 @Composable
-private fun TicketDetailContent(ticket: TicketResponseDto, profile: UserProfile) {
+private fun TicketDetailContent(
+    ticket: TicketResponseDto,
+    profile: UserProfile,
+    uiState: TicketDetailUiState,
+    onAssignClick: () -> Unit,
+    onStartClick: () -> Unit,
+    onResolveClick: () -> Unit,
+) {
     Text(text = stringResource(R.string.ticket_equipment_label, ticket.equipmentModel))
     Text(text = stringResource(R.string.ticket_company_label, ticket.companyName))
     Text(text = ticket.description)
@@ -163,16 +231,34 @@ private fun TicketDetailContent(ticket: TicketResponseDto, profile: UserProfile)
 
     when (profile.role) {
         UserRole.MANAGER, UserRole.ADMIN -> {
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.ticket_assign))
+            if (ticket.status == TicketStatus.NEW) {
+                Button(
+                    onClick = onAssignClick,
+                    enabled = !uiState.isActionInProgress,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.ticket_assign))
+                }
             }
         }
         UserRole.TECHNICIAN -> {
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.ticket_start))
+            if (ticket.status == TicketStatus.ASSIGNED && ticket.technicianId == profile.userId) {
+                Button(
+                    onClick = onStartClick,
+                    enabled = !uiState.isActionInProgress,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.ticket_start))
+                }
             }
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.ticket_resolve))
+            if (ticket.status == TicketStatus.IN_PROGRESS && ticket.technicianId == profile.userId) {
+                Button(
+                    onClick = onResolveClick,
+                    enabled = !uiState.isActionInProgress,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.ticket_resolve))
+                }
             }
         }
         UserRole.CLIENT -> Unit

@@ -1,4 +1,4 @@
-@file:Suppress("HardCodedStringLiteral")
+@file:Suppress("HardCodedStringLiteral", "KDocMissingDocumentation")
 
 package cz.b2brental
 
@@ -17,6 +17,7 @@ import cz.b2brental.routes.dashboardRoutes
 import cz.b2brental.routes.documentRoutes
 import cz.b2brental.routes.paymentRoutes
 import cz.b2brental.routes.ticketRoutes
+import cz.b2brental.routes.userRoutes
 import cz.b2brental.services.AiService
 import cz.b2brental.services.AuthService
 import cz.b2brental.services.CatalogService
@@ -59,7 +60,10 @@ public fun main() {
     }.start(wait = true)
 }
 
-/** Konfigurace a inicializace Ktor modulu */
+/**
+ * Konfigurace a inicializace Ktor modulu.
+ * @param config konfigurace aplikace načtená z proměnných prostředí
+ */
 public fun Application.module(config: Config = Config.fromEnv()) {
     DatabaseFactory.connect(config.dbUrl, config.dbUser, config.dbPass)
     seed()
@@ -215,5 +219,6 @@ public fun Application.module(config: Config = Config.fromEnv()) {
         documentRoutes(pdfService)
         aiRoutes(aiService, dashboardService)
         dashboardRoutes(dashboardService)
+        userRoutes()
     }
 }

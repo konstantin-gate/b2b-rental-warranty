@@ -63,6 +63,9 @@ private class FakeTicketRepository : TicketRepository {
 
     override suspend fun list(): List<TicketResponseDto> = emptyList()
     override suspend fun get(id: Long): TicketResponseDto = error("not used")
+    override suspend fun assign(id: Long, technicianId: Long) = error("not used")
+    override suspend fun start(id: Long) = error("not used")
+    override suspend fun resolve(id: Long, result: String, notes: String) = error("not used")
 }
 
 /**

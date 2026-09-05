@@ -55,6 +55,28 @@ public enum class ErrorType {
     PAYMENT_PAY_FAILED,
     /** Platba již byla dříve uhrazena (HTTP 409). */
     PAYMENT_ALREADY_PAID,
+    /** Načtení metrik přehledu selhalo. */
+    DASHBOARD_LOAD_FAILED,
+    /** Načtení seznamu techniků selhalo. */
+    TECHNICIANS_LOAD_FAILED,
+    /** Přiřazení technika k tiketu selhalo. */
+    TICKET_ASSIGN_FAILED,
+    /** Zahájení opravy tiketu selhalo. */
+    TICKET_START_FAILED,
+    /** Vyřešení tiketu selhalo. */
+    TICKET_RESOLVE_FAILED,
+    /** Poznámky technika jsou prázdné. */
+    NOTES_EMPTY,
+    /** Kontaktování AI asistenta selhalo. */
+    AI_ASSISTANT_FAILED,
+    /** Validační chyba formuláře správy katalogu. */
+    ADMIN_CATALOG_VALIDATION,
+    /** Uložení záznamu katalogu selhalo. */
+    ADMIN_CATALOG_SAVE_FAILED,
+    /** Smazání záznamu katalogu selhalo. */
+    ADMIN_CATALOG_DELETE_FAILED,
+    /** Načtení katalogu pro správu selhalo. */
+    ADMIN_CATALOG_LOAD_FAILED,
     /** Jakákoliv jiná (neočekávaná) chyba. */
     UNKNOWN,
 }

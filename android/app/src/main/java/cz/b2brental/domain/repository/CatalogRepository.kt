@@ -1,6 +1,7 @@
 package cz.b2brental.domain.repository
 
 import cz.b2brental.data.remote.dto.CatalogItemResponseDto
+import cz.b2brental.data.remote.dto.CatalogUpsertRequestDto
 import cz.b2brental.domain.model.EquipmentStatus
 
 /**
@@ -33,4 +34,24 @@ public interface CatalogRepository {
      * @return detail vybavení
      */
     public suspend fun get(id: Long): CatalogItemResponseDto
+
+    /**
+     * Vytvoří nové vybavení (POST /catalog). Vyžaduje roli admin/manager.
+     * @param req požadavek na vytvoření
+     * @return ID vytvořeného vybavení
+     */
+    public suspend fun create(req: CatalogUpsertRequestDto): Long
+
+    /**
+     * Upraví existující vybavení (PUT /catalog/{id}). Vyžaduje roli admin/manager.
+     * @param id ID vybavení
+     * @param req požadavek na úpravu
+     */
+    public suspend fun update(id: Long, req: CatalogUpsertRequestDto)
+
+    /**
+     * Smaže vybavení (DELETE /catalog/{id}). Vyžaduje roli admin/manager.
+     * @param id ID vybavení
+     */
+    public suspend fun delete(id: Long)
 }

@@ -38,6 +38,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 public fun MyEquipmentScreen(
     viewModel: MyEquipmentViewModel,
     onReportIssueClick: (Long) -> Unit,
+    onLogout: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -47,6 +48,8 @@ public fun MyEquipmentScreen(
                 titleRes = R.string.my_equipment_title,
                 onRefresh = { viewModel.retry() },
                 refreshEnabled = true,
+                onLogout = onLogout,
+                logoutEnabled = true,
             )
         },
     ) { padding ->

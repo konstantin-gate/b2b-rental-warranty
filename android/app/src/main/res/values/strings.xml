@@ -121,8 +121,12 @@
     <string name="dashboard_active_contracts">Aktivní smlouvy</string>
     <string name="dashboard_open_tickets">Otevřená hlášení</string>
     <string name="dashboard_overdue_payments">Po splatnosti</string>
+    <string name="dashboard_overdue_amount">Dlužná částka</string>
     <string name="dashboard_equipment">Stav vybavení</string>
     <string name="dashboard_month_stats">Statistiky měsíce</string>
+    <string name="dashboard_month_new_contracts">Nové smlouvy</string>
+    <string name="dashboard_month_paid">Vybráno za období</string>
+    <string name="dashboard_month_resolved">Vyřešená hlášení</string>
     <string name="dashboard_assistant">AI Asistent</string>
 
     <!-- AI Asistent -->
@@ -195,6 +199,7 @@
     <string name="nav_payments">Platby</string>
     <string name="nav_dashboard">Přehled</string>
     <string name="nav_assistant">Asistent</string>
+    <string name="nav_admin_catalog">Správa katalogu</string>
 
     <!-- Část 3-C: hlášení poruchy -->
     <string name="error_empty_description">Zadejte popis poruchy</string>
@@ -236,6 +241,27 @@
     <string name="error_payments_load_failed">Chyba při načítání plateb</string>
     <string name="error_payment_pay_failed">Chyba při zpracování platby</string>
     <string name="error_payment_already_paid">Tato platba již byla uhrazena</string>
+    <string name="error_dashboard_load_failed">Chyba při načítání přehledu</string>
+    <string name="error_technicians_load_failed">Chyba při načítání techniků</string>
+    <string name="error_ticket_assign_failed">Chyba při přiřazování technika</string>
+    <string name="error_ticket_start_failed">Chyba při zahájení práce</string>
+    <string name="assign_dialog_title">Vyberte technika</string>
+    <string name="technicians_empty">Žádní technici nejsou k dispozici</string>
+    <string name="resolve_title">Vyřešit hlášení</string>
+    <string name="resolve_notes_hint">Zpráva o provedené práci (povinná)</string>
+    <string name="resolve_success_title">Hlášení vyřešeno</string>
+    <string name="resolve_success_text">Servisní protokol byl vytvořen.</string>
+    <string name="error_ticket_resolve_failed">Chyba při řešení hlášení</string>
+    <string name="error_notes_empty">Zadejte zprávu o provedené práci</string>
+    <string name="error_ai_assistant_failed">AI asistent se nepodařilo kontaktovat</string>
+    <string name="error_admin_catalog_save_failed">Chyba při ukládání vybavení</string>
+    <string name="error_admin_catalog_delete_failed">Vybavení nelze smazat (pravděpodobně pronajato)</string>
+    <string name="error_admin_catalog_load_failed">Chyba při načítání katalogu</string>
+    <string name="error_admin_catalog_validation">Zkontrolujte kategorii (1–4), model, výrobní číslo a formát částek</string>
+    <string name="notification_channel_name">Aktualizace servisních požadavků</string>
+    <string name="notification_title">B2B Rental</string>
+    <string name="notification_text_new">Nové hlášení č. %1$d (%2$s)</string>
+    <string name="notification_text_changed">Hlášení č. %1$d: %2$s → %3$s</string>
     <string name="payment_period_label">Období %1$d</string>
     <string name="payment_due_date_label">Splatnost: %1$s</string>
     <string name="payment_paid_at_label">Zaplaceno: %1$s</string>

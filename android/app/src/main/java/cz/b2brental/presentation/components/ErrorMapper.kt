@@ -1,3 +1,5 @@
+@file:Suppress("KDocMissingDocumentation")
+
 package cz.b2brental.presentation.components
 
 import androidx.compose.runtime.Composable
@@ -38,5 +40,16 @@ public fun errorMessage(error: ErrorType?): String? = when (error) {
     ErrorType.PAYMENTS_LOAD_FAILED -> stringResource(R.string.error_payments_load_failed)
     ErrorType.PAYMENT_PAY_FAILED -> stringResource(R.string.error_payment_pay_failed)
     ErrorType.PAYMENT_ALREADY_PAID -> stringResource(R.string.error_payment_already_paid)
+    ErrorType.DASHBOARD_LOAD_FAILED -> stringResource(R.string.error_dashboard_load_failed)
+    ErrorType.TECHNICIANS_LOAD_FAILED -> stringResource(R.string.error_technicians_load_failed)
+    ErrorType.TICKET_ASSIGN_FAILED -> stringResource(R.string.error_ticket_assign_failed)
+    ErrorType.TICKET_START_FAILED -> stringResource(R.string.error_ticket_start_failed)
+    ErrorType.TICKET_RESOLVE_FAILED -> stringResource(R.string.error_ticket_resolve_failed)
+    ErrorType.NOTES_EMPTY -> stringResource(R.string.error_notes_empty)
+    ErrorType.AI_ASSISTANT_FAILED -> stringResource(R.string.error_ai_assistant_failed)
+    ErrorType.ADMIN_CATALOG_VALIDATION -> stringResource(R.string.error_admin_catalog_validation)
+    ErrorType.ADMIN_CATALOG_SAVE_FAILED -> stringResource(R.string.error_admin_catalog_save_failed)
+    ErrorType.ADMIN_CATALOG_DELETE_FAILED -> stringResource(R.string.error_admin_catalog_delete_failed)
+    ErrorType.ADMIN_CATALOG_LOAD_FAILED -> stringResource(R.string.error_admin_catalog_load_failed)
     ErrorType.UNKNOWN -> stringResource(R.string.error_unknown)
 }

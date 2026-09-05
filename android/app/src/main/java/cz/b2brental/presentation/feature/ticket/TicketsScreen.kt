@@ -49,6 +49,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 public fun TicketsScreen(
     viewModel: TicketsViewModel,
     onTicketClick: (Long) -> Unit,
+    onLogout: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -58,6 +59,8 @@ public fun TicketsScreen(
                 titleRes = R.string.tickets_title,
                 onRefresh = { viewModel.loadTickets() },
                 refreshEnabled = true,
+                onLogout = onLogout,
+                logoutEnabled = true,
             )
         },
     ) { padding ->

@@ -1,6 +1,7 @@
 package cz.b2brental.data.repository
 
 import cz.b2brental.data.remote.B2bApiClient
+import cz.b2brental.data.remote.dto.TicketActionResponseDto
 import cz.b2brental.data.remote.dto.TicketCreateRequestDto
 import cz.b2brental.data.remote.dto.TicketResponseDto
 import cz.b2brental.domain.repository.TicketRepository
@@ -37,5 +38,35 @@ public class TicketRepositoryImpl(
      */
     override suspend fun get(id: Long): TicketResponseDto {
         return apiClient.getTicket(id)
+    }
+
+    /**
+     * Přiřadí technika k tiketu přes POST /tickets/{id}/assign.
+     * @param id ID tiketu
+     * @param technicianId ID technika
+     * @return odpověď s aktualizovaným stavem
+     */
+    override suspend fun assign(id: Long, technicianId: Long): TicketActionResponseDto {
+        return apiClient.assignTicket(id, technicianId)
+    }
+
+    /**
+     * Zahájí opravu tiketu přes POST /tickets/{id}/start.
+     * @param id ID tiketu
+     * @return odpověď s aktualizovaným stavem
+     */
+    override suspend fun start(id: Long): TicketActionResponseDto {
+        return apiClient.startTicket(id)
+    }
+
+    /**
+     * Vyřeší tiket přes POST /tickets/{id}/resolve.
+     * @param id ID tiketu
+     * @param result výsledek řešení
+     * @param notes poznámky technika
+     * @return odpověď s aktualizovaným stavem a případným ID reportu
+     */
+    override suspend fun resolve(id: Long, result: String, notes: String): TicketActionResponseDto {
+        return apiClient.resolveTicket(id, result, notes)
     }
 }

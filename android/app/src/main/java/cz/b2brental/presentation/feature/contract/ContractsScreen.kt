@@ -42,6 +42,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 public fun ContractsScreen(
     viewModel: ContractsViewModel,
     onContractClick: (Long) -> Unit,
+    onLogout: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -51,6 +52,8 @@ public fun ContractsScreen(
                 titleRes = R.string.contracts_title,
                 onRefresh = { viewModel.retry() },
                 refreshEnabled = true,
+                onLogout = onLogout,
+                logoutEnabled = true,
             )
         },
     ) { padding ->

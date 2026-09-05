@@ -46,6 +46,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 @Composable
 public fun PaymentsScreen(
     viewModel: PaymentsViewModel,
+    onLogout: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -55,6 +56,8 @@ public fun PaymentsScreen(
                 titleRes = R.string.payments_title,
                 onRefresh = { viewModel.loadPayments() },
                 refreshEnabled = true,
+                onLogout = onLogout,
+                logoutEnabled = true,
             )
         },
     ) { padding ->

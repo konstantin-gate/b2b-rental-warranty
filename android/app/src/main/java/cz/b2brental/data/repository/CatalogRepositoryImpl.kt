@@ -5,6 +5,7 @@ import cz.b2brental.data.local.entity.CatalogEntity
 import cz.b2brental.data.remote.B2bApiClient
 import cz.b2brental.data.remote.OfflineException
 import cz.b2brental.data.remote.dto.CatalogItemResponseDto
+import cz.b2brental.data.remote.dto.CatalogUpsertRequestDto
 import cz.b2brental.domain.model.EquipmentStatus
 import cz.b2brental.domain.repository.CatalogPage
 import cz.b2brental.domain.repository.CatalogRepository
@@ -52,6 +53,32 @@ public class CatalogRepositoryImpl(
      */
     override suspend fun get(id: Long): CatalogItemResponseDto {
         return apiClient.getEquipment(id)
+    }
+
+    /**
+     * Vytvoří nové vybavení přes POST /catalog.
+     * @param req požadavek na vytvoření
+     * @return ID nového vybavení
+     */
+    override suspend fun create(req: CatalogUpsertRequestDto): Long {
+        return apiClient.createEquipment(req).id
+    }
+
+    /**
+     * Upraví vybavení přes PUT /catalog/{id}.
+     * @param id ID vybavení
+     * @param req požadavek na úpravu
+     */
+    override suspend fun update(id: Long, req: CatalogUpsertRequestDto): Unit {
+        apiClient.updateEquipment(id, req)
+    }
+
+    /**
+     * Smaže vybavení přes DELETE /catalog/{id}.
+     * @param id ID vybavení
+     */
+    override suspend fun delete(id: Long): Unit {
+        apiClient.deleteEquipment(id)
     }
 
     /**
