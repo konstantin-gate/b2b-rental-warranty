@@ -26,6 +26,9 @@ import cz.b2brental.services.DashboardService
 import cz.b2brental.services.PaymentService
 import cz.b2brental.services.PdfService
 import cz.b2brental.services.TicketService
+import cz.b2brental.services.llm.DisabledLlmClient
+import cz.b2brental.services.llm.LlmClient
+import cz.b2brental.services.llm.OpenAiCompatibleLlmClient
 import cz.b2brental.utils.ApiException
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -70,7 +73,13 @@ public fun Application.module(config: Config = Config.fromEnv()) {
 
     val jwtService = JwtService(config.jwtSecret)
     val authService = AuthService(jwtService)
-    val aiService = AiService(config.openaiApiKey)
+    val llmClient: LlmClient =
+        if (config.aiEnabled) {
+            OpenAiCompatibleLlmClient(config)
+        } else {
+            DisabledLlmClient
+        }
+    val aiService = AiService(llmClient)
 
     monitor.subscribe(ApplicationStopping) {
         aiService.close()

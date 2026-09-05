@@ -4,166 +4,120 @@ package cz.b2brental.services
 
 import cz.b2brental.db.Severity
 import cz.b2brental.db.WarrantyVerdict
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.Serializable
+import cz.b2brental.services.llm.LlmClient
+import cz.b2brental.services.llm.LlmCompletionRequest
+import cz.b2brental.services.llm.LlmFailure
+import cz.b2brental.services.llm.LlmMessage
+import cz.b2brental.services.llm.LlmSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
-/** Výsledek diagnostiky AI */
+/**
+ * Výsledek diagnostiky AI
+ * @property possibleCause pravděpodobní příčina závady
+ * @property severity závažnost závady (low, medium, critical)
+ * @property recommendation doporučené následující kroky
+ */
 public data class DiagnosisResult(
     public val possibleCause: String,
     public val severity: Severity,
     public val recommendation: String,
 )
 
-/** Služba AI: volání OpenAI chat completions s deterministickým fallbackem */
+/**
+ * Služba AI: příprava promptů, volání LLM klienta a deterministický fallback.
+ * HTTP komunikaci deleguje na [LlmClient], sám síťová volání nevykonává.
+ * @property llmClient klient LLM zajišťující síťová volání
+ */
 public class AiService(
-    private val openaiApiKey: String?,
+    private val llmClient: LlmClient,
 ) : AutoCloseable {
+    /** Logger pro události služby */
     private val log = LoggerFactory.getLogger(AiService::class.java)
 
-    private val client: HttpClient =
-        HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        ignoreUnknownKeys = true
-                        isLenient = true
-                    },
-                )
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 30_000L
-                connectTimeoutMillis = 10_000L
-                socketTimeoutMillis = 30_000L
-            }
-        }
-
-    @Serializable
-    private data class ChatRequest(
-        val model: String,
-        val messages: List<ChatMessage>,
-        val temperature: Double = 0.2,
-    )
-
-    @Serializable
-    private data class ChatMessage(
-        val role: String,
-        val content: JsonElement,
-    )
-
-    @Serializable
-    private data class ChoiceMessage(
-        val content: String? = null,
-    )
-
-    @Serializable
-    private data class Choice(
-        val message: ChoiceMessage,
-    )
-
-    @Serializable
-    private data class ChatResponse(
-        val choices: List<Choice> = emptyList(),
-    )
-
     public companion object {
-        private const val MODEL: String = "gpt-4o-mini"
-        private const val CHAT_URL: String = "https://api.openai.com/v1/chat/completions"
+        /** Maximální délka zalogovaného textu chyby */
         private const val LOG_LIMIT: Int = 250
+
+        /** Povolené hodnoty závažnosti přijímané z odpovědi LLM */
         private val ALLOWED_SEVERITY: Set<String> = setOf("low", "medium", "critical")
     }
 
-    override fun close() {
-        client.close()
-    }
+    /** Uvolní prostředky podřízeného LLM klienta */
+    override fun close(): Unit = llmClient.close()
 
-    private suspend fun chat(messages: List<ChatMessage>): String? {
-        val key: String = openaiApiKey ?: return null
-        return try {
-            val response: ChatResponse =
-                client
-                    .post(CHAT_URL) {
-                        contentType(ContentType.Application.Json)
-                        header(HttpHeaders.Authorization, "Bearer $key")
-                        setBody(ChatRequest(model = MODEL, messages = messages))
-                    }.body()
-            response.choices
-                .firstOrNull()
-                ?.message
-                ?.content
-        } catch (e: Throwable) {
-            log.warn("OpenAI volání selhalo: ${e.message.orEmpty().take(LOG_LIMIT)}")
+    /**
+     * Provede dokončení konverzace přes klienta LLM.
+     * @param messages zprávy konverzace k odeslání modelu
+     * @return text odpovědi nebo null při selhání (včetně vypnutého AI)
+     */
+    private suspend fun chat(messages: List<LlmMessage>): String? =
+        try {
+            val result =
+                llmClient.complete(
+                    LlmCompletionRequest(messages = messages),
+                )
+            when (result) {
+                is LlmSuccess -> result.text
+                is LlmFailure -> {
+                    log.warn("Volání LLM selhalo: ${result.message.take(LOG_LIMIT)}")
+                    null
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Volání LLM selhalo: ${e.message.orEmpty().take(LOG_LIMIT)}")
             null
         }
-    }
 
-    /** Diagnostika poruchy: LLM s fallbackem a podporou multimodálních zpráv */
+    /**
+     * Diagnostika poruchy: LLM s deterministickým fallbackem.
+     * Fotografie se na LLM neposílá jako obrázek - pouze textové upozornění.
+     * @param description textový popis závady od klienta
+     * @param photoBase64 base64 fotografie závady nebo null
+     * @return výsledek diagnostiky
+     */
     public suspend fun diagnose(
         description: String,
         photoBase64: String?,
     ): DiagnosisResult {
-        val systemPrompt =
+        val systemPrompt: String =
             "Jsi inženýr pro diagnostiku komerčního chladicího zařízení. " +
                 "Odpovídej VÝHRADNĚ platným JSON objektem ve tvaru: " +
                 "{\"possible_cause\":\"...\",\"severity\":\"low|medium|critical\",\"recommendation\":\"...\"}. " +
                 "Žádný jiný text."
 
-        val userContent: JsonElement =
+        val userContent: String =
             if (photoBase64.isNullOrBlank()) {
-                JsonPrimitive("Popis závady: $description")
+                "Popis závady: $description"
             } else {
-                val dataUrl = if (photoBase64.startsWith("data:")) photoBase64 else "data:image/jpeg;base64,$photoBase64"
-                buildJsonArray {
-                    add(
-                        JsonObject(
-                            mapOf(
-                                "type" to JsonPrimitive("text"),
-                                "text" to JsonPrimitive("Popis závady: $description"),
-                            ),
-                        ),
-                    )
-                    add(
-                        JsonObject(
-                            mapOf(
-                                "type" to JsonPrimitive("image_url"),
-                                "image_url" to JsonObject(mapOf("url" to JsonPrimitive(dataUrl))),
-                            ),
-                        ),
-                    )
-                }
+                "Popis závady: $description (fotografie přiložena, model obraz neuvažuje)"
             }
 
-        val answer: String =
+        val answer: String? =
             chat(
                 listOf(
-                    ChatMessage("system", JsonPrimitive(systemPrompt)),
-                    ChatMessage("user", userContent),
+                    LlmMessage("system", systemPrompt),
+                    LlmMessage("user", userContent),
                 ),
-            ) ?: return fallbackDiagnose()
+            )
+        if (answer == null) return fallbackDiagnose()
 
         return parseDiagnosis(answer)
     }
 
-    /** Vysvětlení deterministického verdiktu LLM v češtině (2 věty) */
+    /**
+     * Vysvětlení deterministického verdiktu LLM v češtině (2 věty).
+     * @param verdict verdikt garance z pravidlového enginu
+     * @param reason odůvodnění verdiktu pravidly nebo null
+     * @return text vysvětlení (s fallbackem při nedostupnosti AI)
+     */
     public suspend fun explainVerdict(
         verdict: WarrantyVerdict,
         reason: String?,
@@ -171,21 +125,24 @@ public class AiService(
         val answer: String? =
             chat(
                 listOf(
-                    ChatMessage(
+                    LlmMessage(
                         "system",
-                        JsonPrimitive(
-                            "Jsi zákaznický poradce půjčovny chladicího zařízení. Vysvětli max. ve 2 větách česky, " +
-                                "proč záruční verdikt dopadl takto. Pouze vysvětlení, žádné další texty.",
-                        ),
+                        "Jsi zákaznický poradce půjčovny chladicího zařízení. Vysvětli max. ve 2 větách česky, " +
+                            "proč záruční verdikt dopadl takto. Pouze vysvětlení, žádné další texty.",
                     ),
-                    ChatMessage("user", JsonPrimitive("Verdikt: ${verdict.name}. Odůvodnění pravidly: ${reason ?: "neuvedeno"}")),
+                    LlmMessage("user", "Verdikt: ${verdict.name}. Odůvodnění pravidly: ${reason ?: "neuvedeno"}"),
                 ),
             )
         return answer?.trim().takeUnless { it.isNullOrEmpty() }
             ?: "AI není dostupná — verdikt vypočítán pravidly: ${reason ?: "bez dodatečného odůvodnění"}"
     }
 
-    /** Odpověď AI asistenta s kontextem metrik */
+    /**
+     * Odpověď AI asistenta s kontextem metrik.
+     * @param message dotaz uživatele
+     * @param context kontext dat systému pro odpověď
+     * @return text odpovědi asistenta (s fallbackem při nedostupnosti AI)
+     */
     public suspend fun assistantReply(
         message: String,
         context: String,
@@ -193,20 +150,19 @@ public class AiService(
         val answer: String? =
             chat(
                 listOf(
-                    ChatMessage(
+                    LlmMessage(
                         "system",
-                        JsonPrimitive(
-                            "Jsi AI asistent manažera půjčovny komerčního chladicího zařízení. " +
-                                "Odpovídej česky na základě uvedených dat systému.\n" +
-                                "Kontext dat systému:\n$context",
-                        ),
+                        "Jsi AI asistent manažera půjčovny komerčního chladicího zařízení. " +
+                            "Odpovídej česky na základě uvedených dat systému.\n" +
+                            "Kontext dat systému:\n$context",
                     ),
-                    ChatMessage("user", JsonPrimitive(message)),
+                    LlmMessage("user", message),
                 ),
             )
         return answer?.trim().takeUnless { it.isNullOrEmpty() } ?: "AI asistent není dostupný"
     }
 
+    /** Deterministický fallback diagnostiky při nedostupnosti AI */
     private fun fallbackDiagnose(): DiagnosisResult =
         DiagnosisResult(
             possibleCause = "Příčina nebyla určena — AI není dostupná",
@@ -214,6 +170,11 @@ public class AiService(
             recommendation = "Vyžaduje ruční diagnostiku technikem",
         )
 
+    /**
+     * Rozparsuje odpověď LLM na výsledek diagnostiky s fallbackem při chybě.
+     * @param answer text odpovědi LLM
+     * @return výsledek diagnostiky
+     */
     private fun parseDiagnosis(answer: String): DiagnosisResult {
         val json: JsonObject = extractJsonObject(answer) ?: return fallbackDiagnose()
         return try {
@@ -227,11 +188,16 @@ public class AiService(
                 json["recommendation"]?.jsonPrimitive?.contentOrNull
                     ?: "Vyžaduje ruční diagnostiku technikem"
             DiagnosisResult(cause, severity, recommendation)
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             fallbackDiagnose()
         }
     }
 
+    /**
+     * Vyhledá a rozparsuje první JSON objekt v textu odpovědi.
+     * @param answer text odpovědi LLM
+     * @return rozparsovaný JSON objekt nebo null, pokud v textu není
+     */
     private fun extractJsonObject(answer: String): JsonObject? {
         return try {
             val start = answer.indexOf('{')
@@ -239,7 +205,7 @@ public class AiService(
             if (start == -1 || end == -1 || start >= end) return null
             val cleaned = answer.substring(start, end + 1)
             Json.parseToJsonElement(cleaned).jsonObject
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             null
         }
     }

@@ -66,6 +66,7 @@ dependencies {
 
     // Test dependencies
     testImplementation("io.ktor:ktor-server-test-host-jvm:3.0.3")
+    testImplementation("io.ktor:ktor-client-mock-jvm:3.0.3")
     testImplementation("com.h2database:h2:2.3.232")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

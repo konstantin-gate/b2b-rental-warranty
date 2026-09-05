@@ -26,7 +26,14 @@ public fun withB2bTestApp(
                         dbUser = "sa",
                         dbPass = "",
                         jwtSecret = "test-secret-32-znaku-minimum-pro-hs256",
-                        openaiApiKey = null,
+                        aiBaseUrl = "http://127.0.0.1:8080/v1",
+                        aiModel = "test-model",
+                        aiApiKey = null,
+                        aiRequestTimeoutMillis = 30000L,
+                        aiConnectTimeoutMillis = 5000L,
+                        aiMaxRetries = 0,
+                        aiMaxOutputTokens = 700,
+                        aiEnabled = false,
                     ),
                 )
             }

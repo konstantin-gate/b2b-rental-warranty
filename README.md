@@ -10,9 +10,11 @@ Platforma pro pronájem a záruční servis komerčního chladicího zařízení
 │  (Compose)  │     │  (Ktor)     │     │     16       │
 └─────────────┘     └──────┬──────┘     └──────────────┘
                            │
-                    ┌──────▼──────┐
-                    │  OpenAI API │
-                    └─────────────┘
+                    ┌──────▼──────────┐
+                    │  llama-server   │
+                    │ (lokální LLM,   │
+                    │  OpenAI API)    │
+                    └─────────────────┘
 ```
 
 ## Stack
@@ -78,8 +80,8 @@ Platforma pro pronájem a záruční servis komerčního chladicího zařízení
 
 ## AI integrace
 
-- **Model:** `gpt-4o-mini` (OpenAI)
-- **Klíč:** nastavte proměnnou prostředí `OPENAI_API_KEY` v `.env`
-- **Volání:** probíhá přes backend (`/ai/diagnose`, `/ai/warranty-check`, `/ai/assistant`)
-- **Fallback:** pokud klíč není nastaven nebo API nedostupné, vrací se deterministická odpověď bez pádu serveru
-- **Bezpečnost:** `OPENAI_API_KEY` je pouze na backendu, nikdy se nedostane do Android aplikace ani do gitu
+- **Model:** lokální `llama-server` s OpenAI-kompatibilním API (jediný runtime poskytovatel LLM)
+- **Konfigurace:** proměnné prostředí v `.env` — `AI_BASE_URL` (výchozí `http://127.0.0.1:8080/v1`), `AI_MODEL` (název modelu z `GET http://127.0.0.1:8080/v1/models`), `AI_API_KEY` (nepovinné), `AI_REQUEST_TIMEOUT_MS`, `AI_CONNECT_TIMEOUT_MS`, `AI_MAX_RETRIES`, `AI_MAX_OUTPUT_TOKENS`, `AI_ENABLED`
+- **Volání:** probíhá přes backend (`/ai/diagnose`, `/ai/warranty-check`, `/ai/assistant`); HTTP komunikaci zajišťuje `OpenAiCompatibleLlmClient` s limitem délky vstupu, omezenými opakováními (timeout, chyba spojení, HTTP 429/5xx) a odstraněním bloků `<think>` z odpovědi
+- **Fallback:** pokud je `AI_ENABLED=false` nebo llama-server nedostupný, vrací se deterministická odpověď bez pádu serveru
+- **Bezpečnost:** přístupové údaje k LLM jsou pouze na backendu, nikdy se nedostanou do Android aplikace ani do gitu; obsah promptů a klíče se nelogují
