@@ -78,6 +78,33 @@ Platforma pro pronájem a záruční servis komerčního chladicího zařízení
 | Backend (Ktor) | 8090 |
 | PostgreSQL | 5432 |
 
+## Spuštění přes Docker Compose
+
+1. Spusťte obě služby (PostgreSQL + backend) jedním příkazem:
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. Ověřte dostupnost backendu:
+   ```bash
+   curl -s http://localhost:8090/health
+   # Očekávaná odpověď: {"status":"ok"}
+   ```
+
+3. Úplné smazání dat (včetně databáze):
+   ```bash
+   docker compose down -v
+   ```
+
+V Docker režimu je AI vypnuté (`AI_ENABLED=false` v `docker-compose.yml`), protože
+llama-server se v compose nespouští. Pro zapnutí AI je nutné před `docker compose up`
+nastavit v shellu proměnné prostředí `AI_ENABLED=true`, `AI_MODEL=<název modelu>`,
+`AI_BASE_URL=http://host.docker.internal:8080/v1` (llama-server běží na hostiteli, port
+8080 zůstává modelu) a v `docker-compose.yml` u služby `backend` tytéž proměnné přidat
+do bloku `environment` (`AI_ENABLED: ${AI_ENABLED}`, `AI_MODEL: ${AI_MODEL}`,
+`AI_BASE_URL: ${AI_BASE_URL}`); bez těchto hodnot backend při `AI_ENABLED=true`
+nenastartuje. Demo účty jsou stejné jako v sekci [Demo účty](#demo-účty).
+
 ## AI integrace
 
 - **Model:** lokální `llama-server` s OpenAI-kompatibilním API (jediný runtime poskytovatel LLM)

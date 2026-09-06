@@ -15,5 +15,25 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:?err}
+      DB_USER: ${DB_USER:?err}
+      DB_PASS: ${DB_PASS:?err}
+      JWT_SECRET: ${JWT_SECRET:?err}
+      # AI je v docker rezimu vypnuto (llama-server se v compose nespousti)
+      AI_ENABLED: "false"
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8090/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata:
