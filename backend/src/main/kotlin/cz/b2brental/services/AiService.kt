@@ -1,4 +1,4 @@
-@file:Suppress("HardCodedStringLiteral")
+@file:Suppress("HardCodedStringLiteral", "KDocMissingDocumentation")
 
 package cz.b2brental.services
 
@@ -81,17 +81,28 @@ public class AiService(
      * Fotografie se na LLM neposílá jako obrázek - pouze textové upozornění.
      * @param description textový popis závady od klienta
      * @param photoBase64 base64 fotografie závady nebo null
+     * @param knowledgeContext znalostní kontext z RAG (výsledek KnowledgeBaseService.retrieve)
      * @return výsledek diagnostiky
      */
     public suspend fun diagnose(
         description: String,
         photoBase64: String?,
+        knowledgeContext: KnowledgeContext,
     ): DiagnosisResult {
+        val kbBlock: String = knowledgeContext.asPromptBlock()
         val systemPrompt: String =
             "Jsi inženýr pro diagnostiku komerčního chladicího zařízení. " +
                 "Odpovídej VÝHRADNĚ platným JSON objektem ve tvaru: " +
                 "{\"possible_cause\":\"...\",\"severity\":\"low|medium|critical\",\"recommendation\":\"...\"}. " +
-                "Žádný jiný text."
+                "Žádný jiný text." +
+                if (kbBlock.isEmpty()) {
+                    " Znalostní báze neobsahuje relevantní údaje. " +
+                        "Uveď pouze obecnou bezpečnou diagnózu a nevymyslej kódy chyb výrobců."
+                } else {
+                    " Vycházej výhradně z následujícího bloku znalostí a neuváděj fakta mimo něj. " +
+                        "Citovat v doporučení smíš pouze existující citace ve tvaru [KB:slug#ordinal] " +
+                        "z tohoto bloku.\n$kbBlock"
+                }
 
         val userContent: String =
             if (photoBase64.isNullOrBlank()) {
@@ -109,44 +120,57 @@ public class AiService(
             )
         if (answer == null) return fallbackDiagnose()
 
-        return parseDiagnosis(answer)
+        val parsed: DiagnosisResult = parseDiagnosis(answer)
+        return parsed.copy(recommendation = filterCitations(parsed.recommendation, knowledgeContext))
     }
 
     /**
      * Vysvětlení deterministického verdiktu LLM v češtině (2 věty).
      * @param verdict verdikt garance z pravidlového enginu
      * @param reason odůvodnění verdiktu pravidly nebo null
+     * @param knowledgeContext znalostní kontext z RAG (výsledek KnowledgeBaseService.retrieve)
      * @return text vysvětlení (s fallbackem při nedostupnosti AI)
      */
     public suspend fun explainVerdict(
         verdict: WarrantyVerdict,
         reason: String?,
+        knowledgeContext: KnowledgeContext,
     ): String {
+        val kbBlock: String = knowledgeContext.asPromptBlock()
         val answer: String? =
             chat(
                 listOf(
                     LlmMessage(
                         "system",
                         "Jsi zákaznický poradce půjčovny chladicího zařízení. Vysvětli max. ve 2 větách česky, " +
-                            "proč záruční verdikt dopadl takto. Pouze vysvětlení, žádné další texty.",
+                            "proč záruční verdikt dopadl takto. Pouze vysvětlení, žádné další texty." +
+                            (if (kbBlock.isNotEmpty()) "\nKontext znalostní báze:\n$kbBlock" else "") +
+                            " Nezměň výsledek ani odůvodnění verdiktu, pouze je vysvětli.",
                     ),
                     LlmMessage("user", "Verdikt: ${verdict.name}. Odůvodnění pravidly: ${reason ?: "neuvedeno"}"),
                 ),
             )
-        return answer?.trim().takeUnless { it.isNullOrEmpty() }
-            ?: "AI není dostupná — verdikt vypočítán pravidly: ${reason ?: "bez dodatečného odůvodnění"}"
+        val trimmed: String? = answer?.trim()
+        return if (trimmed.isNullOrEmpty()) {
+            "AI není dostupná — verdikt vypočítán pravidly: ${reason ?: "bez dodatečného odůvodnění"}"
+        } else {
+            filterCitations(trimmed, knowledgeContext)
+        }
     }
 
     /**
      * Odpověď AI asistenta s kontextem metrik.
      * @param message dotaz uživatele
-     * @param context kontext dat systému pro odpověď
+     * @param dashboardContext kontext dat systému pro odpověď
+     * @param knowledgeContext znalostní kontext z RAG (výsledek KnowledgeBaseService.retrieve)
      * @return text odpovědi asistenta (s fallbackem při nedostupnosti AI)
      */
     public suspend fun assistantReply(
         message: String,
-        context: String,
+        dashboardContext: String,
+        knowledgeContext: KnowledgeContext,
     ): String {
+        val kbBlock: String = knowledgeContext.asPromptBlock()
         val answer: String? =
             chat(
                 listOf(
@@ -154,12 +178,34 @@ public class AiService(
                         "system",
                         "Jsi AI asistent manažera půjčovny komerčního chladicího zařízení. " +
                             "Odpovídej česky na základě uvedených dat systému.\n" +
-                            "Kontext dat systému:\n$context",
+                            "Kontext dat systému:\n$dashboardContext" +
+                            (if (kbBlock.isNotEmpty()) "\nKontext znalostní báze:\n$kbBlock" else "") +
+                            " Pokud uvedená data neobsahují odpověď, řekni to explicitně. " +
+                            "Nikdy neuváděj hesla, tokeny ani klíče.",
                     ),
                     LlmMessage("user", message),
                 ),
             )
-        return answer?.trim().takeUnless { it.isNullOrEmpty() } ?: "AI asistent není dostupný"
+        val trimmed: String? = answer?.trim()
+        return if (trimmed.isNullOrEmpty()) "AI asistent není dostupný" else filterCitations(trimmed, knowledgeContext)
+    }
+
+    /**
+     * Odstraní z úspěšné odpovědi LLM citace [KB:...], které nejsou v předaném znalostním kontextu.
+     * Povolené citace zůstávají beze změny, výsledek se sjednotí na mezerách a ořízne.
+     * @param text text úspěšné odpovědi LLM
+     * @param knowledgeContext znalostní kontext s povolenými citacemi
+     * @return text bez vymyšlených citací
+     */
+    private fun filterCitations(
+        text: String,
+        knowledgeContext: KnowledgeContext,
+    ): String {
+        val allowed: Set<String> = knowledgeContext.snippets.map { snippet -> snippet.citation }.toSet()
+        return Regex("\\[KB:[^]]*]")
+            .replace(text) { match -> if (match.value in allowed) match.value else "" }
+            .replace(Regex("  +"), " ")
+            .trim()
     }
 
     /** Deterministický fallback diagnostiky při nedostupnosti AI */

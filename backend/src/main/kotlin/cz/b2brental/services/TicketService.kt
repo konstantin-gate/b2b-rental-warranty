@@ -13,7 +13,6 @@ import cz.b2brental.db.RentalContracts
 import cz.b2brental.db.ServiceTickets
 import cz.b2brental.db.TicketStatus
 import cz.b2brental.db.Users
-import cz.b2brental.db.WarrantyRules
 import cz.b2brental.db.WarrantyVerdict
 import cz.b2brental.domain.TicketId
 import cz.b2brental.models.AssignRequest
@@ -38,11 +37,22 @@ import java.time.Instant
 import java.time.LocalDate
 import java.util.Base64
 
-/** Služba pro správu servisních požadavků a oprav */
+/**
+ * Služba pro správu servisních požadavků a oprav
+ * @property aiService služba AI pro diagnostiku a vysvětlení verdiktu
+ * @property knowledgeBaseService vyhledávací služba znalostní báze (RAG)
+ */
 public class TicketService(
     private val aiService: AiService,
+    private val knowledgeBaseService: KnowledgeBaseService,
 ) {
-    /** Vytvoření nového tiketu klientem s AI diagnostikou a hodnocením záruky */
+    /**
+     * Vytvoření nového tiketu klientem s AI diagnostikou a hodnocením záruky
+     * @param callerCompanyId id společnosti volajícího klienta
+     * @param callerUserId id volajícího uživatele
+     * @param req data nového tiketu (vybavení, popis, foto)
+     * @return vytvořený tiket s výsledkem AI diagnostiky a verdiktem záruky
+     */
     public suspend fun create(
         callerCompanyId: Long,
         callerUserId: Long,
@@ -65,7 +75,7 @@ public class TicketService(
         }
 
         // FÁZE 1: Načtení dat z DB v krátké transakci
-        val (contractStartDate, warrantyRuleRow) =
+        val prelude: WarrantyPrelude =
             transaction {
                 Equipment.selectAll().where { Equipment.id eq req.equipmentId.value }.singleOrNull()
                     ?: throw NotFoundException("Vybavení nenalezeno")
@@ -94,35 +104,41 @@ public class TicketService(
 
                 val eqRow = Equipment.selectAll().where { Equipment.id eq req.equipmentId.value }.single()
                 val contract = RentalContracts.selectAll().where { RentalContracts.id eq equipmentContractId }.single()
-                val rule = WarrantyRules.selectAll().where { WarrantyRules.categoryId eq eqRow[Equipment.categoryId].value }.singleOrNull()
-
-                Pair(contract[RentalContracts.startDate], rule)
+                buildWarrantyPrelude(
+                    categoryId = eqRow[Equipment.categoryId].value,
+                    equipmentModel = eqRow[Equipment.model],
+                    contractStartDate = contract[RentalContracts.startDate],
+                )
             }
 
         // FÁZE 2: Deterministické hodnocení a AI volání mimo transakci
         val evaluation: WarrantyEvaluation =
-            if (warrantyRuleRow == null) {
+            if (!prelude.hasRule) {
                 WarrantyEvaluation(
                     WarrantyVerdict.review_required,
                     "Není záruční pravidlo pro kategorii — vyžaduje ruční posouzení",
                 )
             } else {
-                val excludedCauses: List<String> =
-                    warrantyRuleRow[WarrantyRules.excludedCauses]
-                        .split(',')
-                        .map { it.trim() }
-                        .filter { it.isNotEmpty() }
                 WarrantyService.evaluate(
-                    contractStartDate = contractStartDate,
-                    warrantyMonths = warrantyRuleRow[WarrantyRules.warrantyMonths],
+                    contractStartDate = prelude.contractStartDate,
+                    warrantyMonths = prelude.warrantyMonths,
                     description = req.description,
-                    excludedCauses = excludedCauses,
+                    excludedCauses = prelude.excludedCauses,
                     today = LocalDate.now(),
                 )
             }
 
-        val diagnosis: DiagnosisResult = aiService.diagnose(req.description, req.photoBase64)
-        val explanation: String = aiService.explainVerdict(evaluation.verdict, evaluation.reason)
+        val kb =
+            knowledgeBaseService.retrieve(
+                KnowledgeQuery(
+                    text = req.description,
+                    categoryName = prelude.categoryName,
+                    equipmentModel = prelude.equipmentModel,
+                    errorCode = null,
+                ),
+            )
+        val diagnosis: DiagnosisResult = aiService.diagnose(req.description, req.photoBase64, kb)
+        val explanation: String = aiService.explainVerdict(evaluation.verdict, evaluation.reason, kb)
 
         // FÁZE 3: Uložení tiketu v krátké transakci
         return transaction {
@@ -151,7 +167,13 @@ public class TicketService(
         }
     }
 
-    /** Seznam tiketů dle role volajícího */
+    /**
+     * Seznam tiketů dle role volajícího
+     * @param callerUserId id volajícího uživatele
+     * @param role role volajícího (admin/manager/technician/client)
+     * @param callerCompanyId id společnosti volajícího klienta nebo null
+     * @return seznam tiketů dostupných volajícímu podle jeho role
+     */
     public fun list(
         callerUserId: Long,
         role: String,
@@ -173,7 +195,14 @@ public class TicketService(
             query.map(::toResponse)
         }
 
-    /** Detail konkrétního tiketu s kontrolou přístupu */
+    /**
+     * Detail konkrétního tiketu s kontrolou přístupu
+     * @param id identifikátor tiketu
+     * @param callerUserId id volajícího uživatele
+     * @param role role volajícího (admin/manager/technician/client)
+     * @param callerCompanyId id společnosti volajícího klienta nebo null
+     * @return detail tiketu
+     */
     public fun get(
         id: TicketId,
         callerUserId: Long,
@@ -206,7 +235,13 @@ public class TicketService(
             toResponse(row)
         }
 
-    /** Přiřazení technika k tiketu (manager/admin) */
+    /**
+     * Přiřazení technika k tiketu (manager/admin)
+     * @param id identifikátor tiketu
+     * @param callerUserId id volajícího uživatele (autor záznamu v historii)
+     * @param req požadavek s id technika
+     * @return nový stav tiketu (assigned)
+     */
     public fun assign(
         id: TicketId,
         callerUserId: Long,
@@ -250,7 +285,12 @@ public class TicketService(
             TicketActionResponse(id.value, TicketStatus.assigned)
         }
 
-    /** Zahájení prací na tiketu technikem */
+    /**
+     * Zahájení prací na tiketu technikem
+     * @param id identifikátor tiketu
+     * @param callerUserId id volajícího technika (musí být přiřazen k tiketu)
+     * @return nový stav tiketu (in_progress)
+     */
     public fun start(
         id: TicketId,
         callerUserId: Long,
@@ -286,7 +326,13 @@ public class TicketService(
             TicketActionResponse(id.value, TicketStatus.in_progress)
         }
 
-    /** Vyřešení tiketu technikem se záznamem servisního protokolu */
+    /**
+     * Vyřešení tiketu technikem se záznamem servisního protokolu
+     * @param id identifikátor tiketu
+     * @param callerUserId id volajícího technika (musí být přiřazen k tiketu)
+     * @param req výsledek řešení (repaired/replaced/not_covered) a poznámky
+     * @return nový stav tiketu (resolved) a id dokumentu protokolu
+     */
     public fun resolve(
         id: TicketId,
         callerUserId: Long,
@@ -350,7 +396,11 @@ public class TicketService(
             TicketActionResponse(id.value, TicketStatus.resolved, docId)
         }
 
-    /** Interní načtení tiketu podle id */
+    /**
+     * Interní načtení tiketu podle id
+     * @param ticketIdValue číselný identifikátor tiketu
+     * @return odpověď o tiketu
+     */
     private fun getInternal(ticketIdValue: Long): TicketResponse {
         val row =
             ServiceTickets
@@ -361,7 +411,11 @@ public class TicketService(
         return toResponse(row)
     }
 
-    /** Mapování řádku DB na odpověď o tiketu */
+    /**
+     * Mapování řádku DB na odpověď o tiketu
+     * @param row řádek tabulky ServiceTickets
+     * @return odpověď o tiketu včetně modelu vybavení a názvu firmy
+     */
     private fun toResponse(row: ResultRow): TicketResponse {
         val eqId: Long = row[ServiceTickets.equipmentId].value
         val eqModel: String =
@@ -401,6 +455,11 @@ public class TicketService(
     /**
      * Idempotentní získání nebo vytvoření záznamu PDF servisní zprávy k vyřešenému tiketu.
      * Klient smí pouze tikety své společnosti, technik pouze tikety přiřazené jemu.
+     * @param ticketId identifikátor tiketu
+     * @param role role volajícího (technician/client)
+     * @param callerCompanyId id společnosti volajícího klienta nebo null
+     * @param callerUserId id volajícího uživatele
+     * @return odpověď s dokumentem PDF servisní zprávy
      */
     public fun pdfDocument(
         ticketId: Long,
