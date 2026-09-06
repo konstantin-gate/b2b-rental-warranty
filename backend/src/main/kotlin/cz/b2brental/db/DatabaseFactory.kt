@@ -11,6 +11,13 @@ import org.slf4j.LoggerFactory
 public object DatabaseFactory {
     private val log = LoggerFactory.getLogger(DatabaseFactory::class.java)
 
+    /**
+     * Vytvoří HikariCP pool, připojí Exposed databázi a vytvoří/ověří schéma tabulek.
+     * @param dbUrl JDBC URL databáze (např. jdbc:postgresql://postgres:5432/b2b_rental)
+     * @param dbUser uživatelské jméno pro připojení k databázi
+     * @param dbPass heslo pro připojení k databázi
+     * @param driver plný název JDBC ovladače (defaultně dle prefixu URL: H2 nebo PostgreSQL)
+     */
     @Suppress("HardCodedStringLiteral")
     public fun connect(
         dbUrl: String,
@@ -42,6 +49,8 @@ public object DatabaseFactory {
                 HistoryEvents,
                 Documents,
                 Notifications,
+                KnowledgeDocuments,
+                KnowledgeChunks,
             )
         }
         log.info("Databázové schéma vytvořeno/ověřeno")

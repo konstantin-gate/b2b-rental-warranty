@@ -23,6 +23,7 @@ import cz.b2brental.services.AuthService
 import cz.b2brental.services.CatalogService
 import cz.b2brental.services.ContractService
 import cz.b2brental.services.DashboardService
+import cz.b2brental.services.KnowledgeIndexService
 import cz.b2brental.services.PaymentService
 import cz.b2brental.services.PdfService
 import cz.b2brental.services.TicketService
@@ -70,6 +71,8 @@ public fun main() {
 public fun Application.module(config: Config = Config.fromEnv()) {
     DatabaseFactory.connect(config.dbUrl, config.dbUser, config.dbPass)
     seed()
+    val knowledgeIndexService = KnowledgeIndexService()
+    knowledgeIndexService.synchronize()
 
     val jwtService = JwtService(config.jwtSecret)
     val authService = AuthService(jwtService)
