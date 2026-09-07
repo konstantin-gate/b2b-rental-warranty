@@ -23,6 +23,66 @@ Platforma pro pronájem a záruční servis komerčního chladicího zařízení
 - **Android:** Kotlin 2.x | Jetpack Compose | Material 3
 - **Infra:** Docker Compose
 
+## Funkce aplikace
+
+### Role client
+- **Katalog vybavení** — prohlížení katalogu s filtrováním podle kategorie, karta vybavení (cena, měsíční sazba, popis, foto, stav).
+- **Nájemní smlouvy** — vytvoření draftu smlouvy (výběr vybavení, doba nájmu 1–36 měsíců, adresa doručení), přehled smluv, PDF dokumenty (smlouva, předávací protokol, protokol o vrácení).
+- **Platby** — přehled plateb smlouvy, označení zaplacení, přehled dlužných (overdue) plateb.
+- **Servisní tikety** — „Nahlásit poruchu“: popis + fotografie (kamera/galerie), předbežná AI diagnostika a verdikt záruky přímo při tvorbě tiketu; přehled vlastních tiketů včetně historie.
+- **Moje vybavení** — karty pronajatého vybavení se stavem.
+- **AI asistent** — chat s backendovým AI (kontext z dat systému, RAG nad znalostní bází).
+
+### Role technician
+- **Moje úkoly** — seznam přiřazených servisních tiketů.
+- **Karta tiketu** — popis a fotografie závady, AI diagnostika, verdikt záruky s vysvětlením.
+- **Vyřízení tiketu** — výsledek `repaired` / `replaced` / `not_covered` + poznámky, AI pomáhá sestavit text zprávy; systém generuje servisní zprávu (PDF).
+
+### Role manager / admin
+- **Dashboard** — aktivní nájmy, otevřené tikety, zpožděné platby, vybavení podle stavů, statistika.
+- **Schválení/zamítnutí nájmu** — draft → active/rejected, automatické vytvoření grafu plateb, přechod vybavení do stavu `rented`.
+- **Přiřazení technika** k tiketu.
+- **(Admin) Správa katalogu** — CRUD vybavení a kategorií.
+- **Správa uživatelů** (admin).
+
+### Notifikace (všechny role)
+- **Serverové notifikace** — backend je jediným zdrojem; zapisuje notifikace při 6 obchodních událostech (nový/přiřazený/zahájený/vyřešený tiket, schválená/zamítnutá smlouva).
+- **Obrazovka notifikací** — vstup ikonou zvonku v horní liště, počet nepřečtených, označení jedné/všech jako přečtené.
+- **Systémová upozornění** — `SyncWorker` dotazuje `GET /notifications?unread=true` každých 15 minut a zobrazí systémovou notifikaci; poté automaticky `read-all`.
+
+### AI (backend)
+- **AI diagnostika** (`/ai/diagnose`) — popis + foto → pravděpodobná příčina, závažnost, doporučení.
+- **Kontrola záruky** (`/ai/warranty-check`) — deterministická pravidla R1–R4 (WarrantyPrelude) rozhodují verdikt, AI dodává vysvětlení.
+- **AI asistent** (`/ai/assistant`) — odpovídá na dotazy nad daty systému s RAG kontextem ze znalostní báze (filtrace vymyšlených citací).
+
+### Zabezpečení
+- JWT autorizace s rolemi `admin` / `manager` / `technician` / `client` (401 bez tokenu, 403 s cizí rolí).
+- Hesla výhradně jako bcrypt hash; tajné klíče pouze v proměnných prostředí (`.env`).
+
+## Snímky obrazovky
+
+Snímky obrazovky aplikace se ukládají do adresáře `docs/screenshots/` a jsou připojeny níže.
+Na snímky vyžadují spuštěné zařízení/emulátor — jsou přidávány ručně (viz plán, krok 6.3):
+
+| Soubor | Obrazovka |
+|---|---|
+| `docs/screenshots/01_login.png` | Přihlášení (úvodní obrazovka) |
+| `docs/screenshots/02_catalog.png` | Katalog vybavení (client) |
+| `docs/screenshots/03_equipment_detail.png` | Karta vybavení |
+| `docs/screenshots/04_contract_create.png` | Vytvoření nájemní smlouvy |
+| `docs/screenshots/05_contracts.png` | Seznam smluv + PDF |
+| `docs/screenshots/06_ticket_create.png` | „Nahlásit poruchu“ (AI diagnostika) |
+| `docs/screenshots/07_tickets.png` | Seznam servisních tiketů |
+| `docs/screenshots/08_payments.png` | Platby a dlužné částky |
+| `docs/screenshots/09_technician_task.png` | Karta tiketu technika (výsledek, záruka) |
+| `docs/screenshots/10_dashboard.png` | Dashboard manažera |
+| `docs/screenshots/11_admin_catalog.png` | Správa katalogu (admin) |
+| `docs/screenshots/12_notifications.png` | Obrazovka notifikací (zvonek) |
+| `docs/screenshots/13_ai_assistant.png` | AI asistent (chat) |
+
+> Poznámka: soubory zatím nejsou v repozitáři — tabulka slouží jako checklist pro ruční
+> doplnění snímků z emulátoru/zařízení.
+
 ## Stav
 
 🚧 Ve vývoji
