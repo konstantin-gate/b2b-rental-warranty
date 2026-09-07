@@ -47,6 +47,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 public fun PaymentsScreen(
     viewModel: PaymentsViewModel,
     onLogout: () -> Unit,
+    onNotificationsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -58,6 +59,7 @@ public fun PaymentsScreen(
                 refreshEnabled = true,
                 onLogout = onLogout,
                 logoutEnabled = true,
+                onNotificationsClick = onNotificationsClick,
             )
         },
     ) { padding ->

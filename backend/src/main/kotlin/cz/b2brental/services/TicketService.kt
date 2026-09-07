@@ -41,10 +41,12 @@ import java.util.Base64
  * Služba pro správu servisních požadavků a oprav
  * @property aiService služba AI pro diagnostiku a vysvětlení verdiktu
  * @property knowledgeBaseService vyhledávací služba znalostní báze (RAG)
+ * @property notificationService služba notifikací
  */
 public class TicketService(
     private val aiService: AiService,
     private val knowledgeBaseService: KnowledgeBaseService,
+    private val notificationService: NotificationService,
 ) {
     /**
      * Vytvoření nového tiketu klientem s AI diagnostikou a hodnocením záruky
@@ -53,6 +55,7 @@ public class TicketService(
      * @param req data nového tiketu (vybavení, popis, foto)
      * @return vytvořený tiket s výsledkem AI diagnostiky a verdiktem záruky
      */
+    @Suppress("KDocMissingDocumentation")
     public suspend fun create(
         callerCompanyId: Long,
         callerUserId: Long,
@@ -162,6 +165,14 @@ public class TicketService(
                 it[message] = "Tiket vytvořen"
                 it[authorId] = EntityID(callerUserId, Users)
             }
+
+            val eqModel: String =
+                Equipment
+                    .selectAll()
+                    .where { Equipment.id eq req.equipmentId.value }
+                    .map { row -> row[Equipment.model] }
+                    .singleOrNull() ?: "Neznámé vybavení"
+            notificationService.notifyManagersAndAdmins("Nový servisní tiket #${ticketIdEntity.value} ($eqModel)")
 
             getInternal(ticketIdEntity.value)
         }
@@ -282,6 +293,8 @@ public class TicketService(
                 it[authorId] = EntityID(callerUserId, Users)
             }
 
+            notificationService.notifyTechnician(req.technicianId.value, "Tiket #${id.value} vám byl přiřazen")
+
             TicketActionResponse(id.value, TicketStatus.assigned)
         }
 
@@ -322,6 +335,8 @@ public class TicketService(
                 it[message] = "Zahájeny práce na tiketu"
                 it[authorId] = EntityID(callerUserId, Users)
             }
+
+            notificationService.notifyManagersAndAdmins("Technik zahájil práce na tiketu #${id.value}")
 
             TicketActionResponse(id.value, TicketStatus.in_progress)
         }
@@ -392,6 +407,9 @@ public class TicketService(
                 it[message] = "Tiket vyřešen: ${req.result}"
                 it[authorId] = EntityID(callerUserId, Users)
             }
+
+            notificationService.notifyManagersAndAdmins("Tiket #${id.value} vyřešen (${req.result})")
+            notificationService.notifyCompanyClients(row[ServiceTickets.companyId].value, "Tiket #${id.value} vyřešen (${req.result})")
 
             TicketActionResponse(id.value, TicketStatus.resolved, docId)
         }

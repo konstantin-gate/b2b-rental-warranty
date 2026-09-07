@@ -39,6 +39,7 @@ public fun MyEquipmentScreen(
     viewModel: MyEquipmentViewModel,
     onReportIssueClick: (Long) -> Unit,
     onLogout: () -> Unit,
+    onNotificationsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -50,6 +51,7 @@ public fun MyEquipmentScreen(
                 refreshEnabled = true,
                 onLogout = onLogout,
                 logoutEnabled = true,
+                onNotificationsClick = onNotificationsClick,
             )
         },
     ) { padding ->

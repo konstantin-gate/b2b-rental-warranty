@@ -54,6 +54,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 public fun AdminCatalogScreen(
     viewModel: AdminCatalogViewModel,
     onLogout: () -> Unit,
+    onNotificationsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var pendingDelete by remember { mutableStateOf<CatalogItemResponseDto?>(null) }
@@ -66,6 +67,7 @@ public fun AdminCatalogScreen(
                 refreshEnabled = true,
                 onLogout = onLogout,
                 logoutEnabled = true,
+                onNotificationsClick = onNotificationsClick,
             )
         },
         floatingActionButton = {
@@ -230,13 +232,18 @@ private fun CatalogEditorDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                EditorField(categoryIdText, R.string.admin_catalog_category_id) { value -> categoryIdText = value }
-                EditorField(model, R.string.admin_catalog_model) { value -> model = value }
-                EditorField(serial, R.string.admin_catalog_serial_number) { value -> serial = value }
-                EditorField(price, R.string.admin_catalog_price) { value -> price = value }
-                EditorField(rate, R.string.admin_catalog_monthly_rate) { value -> rate = value }
-                EditorField(description, R.string.admin_catalog_description) { value -> description = value }
-                EditorField(photoUrl, R.string.admin_catalog_photo_url) { value -> photoUrl = value }
+                // Pole editoru jsou definovaná datově, aby se neopakovaly shodné fragmenty kódu
+                val fields: List<Triple<String, Int, (String) -> Unit>> =
+                    listOf(
+                        Triple(categoryIdText, R.string.admin_catalog_category_id) { value -> categoryIdText = value },
+                        Triple(model, R.string.admin_catalog_model) { value -> model = value },
+                        Triple(serial, R.string.admin_catalog_serial_number) { value -> serial = value },
+                        Triple(price, R.string.admin_catalog_price) { value -> price = value },
+                        Triple(rate, R.string.admin_catalog_monthly_rate) { value -> rate = value },
+                        Triple(description, R.string.admin_catalog_description) { value -> description = value },
+                        Triple(photoUrl, R.string.admin_catalog_photo_url) { value -> photoUrl = value },
+                    )
+                fields.forEach { field -> EditorField(field.first, field.second, field.third) }
             }
         },
         confirmButton = {

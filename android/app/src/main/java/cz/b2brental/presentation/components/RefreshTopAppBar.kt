@@ -4,6 +4,7 @@ package cz.b2brental.presentation.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import cz.b2brental.R
  * @param refreshEnabled zda se má tlačítko «Obnovit» vůbec zobrazit (např. před načtením dat)
  * @param onLogout callback pro akci «Odhlásit se» (null = tlačítko skryto)
  * @param logoutEnabled zda se má tlačítko «Odhlásit se» zobrazit
+ * @param onNotificationsClick callback pro otevření obrazovky notifikací (null = ikona skryta)
  */
 @Suppress("KDocMissingDocumentation")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,10 +37,19 @@ public fun RefreshTopAppBar(
     refreshEnabled: Boolean,
     onLogout: (() -> Unit)? = null,
     logoutEnabled: Boolean = false,
+    onNotificationsClick: (() -> Unit)? = null,
 ) {
     TopAppBar(
         title = { Text(stringResource(titleRes)) },
         actions = {
+            if (onNotificationsClick != null) {
+                IconButton(onClick = onNotificationsClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Notifications,
+                        contentDescription = stringResource(R.string.notifications_title),
+                    )
+                }
+            }
             if (refreshEnabled) {
                 IconButton(onClick = onRefresh) {
                     Icon(

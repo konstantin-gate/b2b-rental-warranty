@@ -416,4 +416,57 @@ public class B2bApiClient(
             }.body()
         }
     }
+
+    // --- NOTIFICATIONS ---
+
+    /**
+     * Získání seznamu notifikací uživatele (GET /notifications). Vyžaduje přihlášení.
+     * @param unreadOnly true pro vrácení pouze nepřečtených notifikací
+     * @return seznam notifikací
+     */
+    public suspend fun getNotifications(unreadOnly: Boolean): List<NotificationDto> {
+        return safeApiCall(sessionClearer) {
+            client.get("/notifications") {
+                authHeader()
+                if (unreadOnly) parameter("unread", "true")
+            }.body()
+        }
+    }
+
+    /**
+     * Získání počtu nepřečtených notifikací (GET /notifications/unread-count). Vyžaduje přihlášení.
+     * @return počet nepřečtených notifikací
+     */
+    public suspend fun getUnreadNotificationCount(): UnreadCountDto {
+        return safeApiCall(sessionClearer) {
+            client.get("/notifications/unread-count") {
+                authHeader()
+            }.body()
+        }
+    }
+
+    /**
+     * Označení notifikace jako přečtené (POST /notifications/{id}/read). Vyžaduje přihlášení.
+     * @param id ID notifikace
+     * @return aktualizovaná notifikace
+     */
+    public suspend fun markNotificationRead(id: Long): NotificationDto {
+        return safeApiCall(sessionClearer) {
+            client.post("/notifications/$id/read") {
+                authHeader()
+            }.body()
+        }
+    }
+
+    /**
+     * Označení všech notifikací jako přečtené (POST /notifications/read-all). Vyžaduje přihlášení.
+     * @return odpověď s nulovým počtem nepřečtených
+     */
+    public suspend fun markAllNotificationsRead(): UnreadCountDto {
+        return safeApiCall(sessionClearer) {
+            client.post("/notifications/read-all") {
+                authHeader()
+            }.body()
+        }
+    }
 }

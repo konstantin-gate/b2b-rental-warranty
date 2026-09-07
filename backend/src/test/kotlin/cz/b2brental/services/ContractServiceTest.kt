@@ -54,14 +54,14 @@ class ContractServiceTest {
 
     @Test
     fun listEmptyTest() {
-        val service = ContractService()
+        val service = ContractService(NotificationService())
         val result = service.list("admin", null)
         assertEquals(0, result.size)
     }
 
     @Test
     fun pdfDocumentNotFoundTest() {
-        val service = ContractService()
+        val service = ContractService(NotificationService())
         assertFailsWith<NotFoundException> {
             service.pdfDocument(ContractId(99999), "admin", null, 1L)
         }
@@ -91,7 +91,7 @@ class ContractServiceTest {
                     }.value
             }
 
-        val service = ContractService()
+        val service = ContractService(NotificationService())
         assertFailsWith<ForbiddenException> {
             service.pdfDocument(ContractId(contractId), "client", 9999L, 1L)
         }
@@ -99,7 +99,7 @@ class ContractServiceTest {
 
     @Test
     fun approveNotFoundTest() {
-        val service = ContractService()
+        val service = ContractService(NotificationService())
         assertFailsWith<NotFoundException> {
             service.approve(ContractId(99999))
         }
@@ -107,7 +107,7 @@ class ContractServiceTest {
 
     @Test
     fun rejectNotFoundTest() {
-        val service = ContractService()
+        val service = ContractService(NotificationService())
         assertFailsWith<NotFoundException> {
             service.reject(ContractId(99999))
         }

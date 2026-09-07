@@ -57,6 +57,9 @@ public object Routes {
     /** Prohlížeč PDF dokumentu (parametr: documentId). */
     public const val DOCUMENT: String = "document/{documentId}"
 
+    /** Obrazovka notifikací uživatele. */
+    public const val NOTIFICATIONS: String = "notifications"
+
     /**
      * Vytvoří trasu detailu vybavení.
      * @param equipmentId ID vybavení

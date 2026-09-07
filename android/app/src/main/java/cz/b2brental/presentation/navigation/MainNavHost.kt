@@ -35,6 +35,8 @@ import cz.b2brental.presentation.feature.equipment.MyEquipmentScreen
 import cz.b2brental.presentation.feature.equipment.MyEquipmentViewModel
 import cz.b2brental.presentation.feature.payment.PaymentsScreen
 import cz.b2brental.presentation.feature.payment.PaymentsViewModel
+import cz.b2brental.presentation.feature.notification.NotificationsScreen
+import cz.b2brental.presentation.feature.notification.NotificationsViewModel
 import cz.b2brental.presentation.feature.ticket.ReportIssueScreen
 import cz.b2brental.presentation.feature.ticket.ReportIssueViewModel
 import cz.b2brental.presentation.feature.ticket.ResolveTicketScreen
@@ -87,7 +89,11 @@ public fun MainNavHost(
             ) { backStackEntry ->
                 val equipmentId: Long = backStackEntry.arguments?.getLong("equipmentId") ?: return@composable
                 val viewModel: EquipmentDetailViewModel = koinViewModel()
-                EquipmentDetailScreen(equipmentId = equipmentId, viewModel = viewModel)
+                EquipmentDetailScreen(
+                    equipmentId = equipmentId,
+                    viewModel = viewModel,
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
+                )
             }
             composable(
                 route = Routes.CONTRACT_NEW,
@@ -114,6 +120,7 @@ public fun MainNavHost(
                         navController.navigate(Routes.contractDetail(contractId))
                     },
                     onLogout = onLogout,
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                 )
             }
             composable(
@@ -129,6 +136,7 @@ public fun MainNavHost(
                     onPdfRequested = { docId ->
                         navController.navigate(Routes.document(docId))
                     },
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                 )
             }
             composable(Routes.MY_EQUIPMENT) {
@@ -139,6 +147,7 @@ public fun MainNavHost(
                         navController.navigate(Routes.reportIssue(equipmentId))
                     },
                     onLogout = onLogout,
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                 )
             }
             composable(
@@ -164,6 +173,7 @@ public fun MainNavHost(
                     viewModel = viewModel,
                     onTicketClick = { ticketId -> navController.navigate(Routes.ticketDetail(ticketId)) },
                     onLogout = onLogout,
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                 )
             }
             composable(
@@ -195,7 +205,11 @@ public fun MainNavHost(
             }
             composable(Routes.PAYMENTS) {
                 val viewModel: PaymentsViewModel = koinViewModel()
-                PaymentsScreen(viewModel = viewModel, onLogout = onLogout)
+                PaymentsScreen(
+                    viewModel = viewModel,
+                    onLogout = onLogout,
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
+                )
             }
             composable(Routes.DASHBOARD) {
                 val viewModel: DashboardViewModel = koinViewModel()
@@ -213,7 +227,18 @@ public fun MainNavHost(
             }
             composable(Routes.ADMIN_CATALOG) {
                 val viewModel: AdminCatalogViewModel = koinViewModel()
-                AdminCatalogScreen(viewModel = viewModel, onLogout = onLogout)
+                AdminCatalogScreen(
+                    viewModel = viewModel,
+                    onLogout = onLogout,
+                    onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
+                )
+            }
+            composable(Routes.NOTIFICATIONS) {
+                val viewModel: NotificationsViewModel = koinViewModel()
+                NotificationsScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = Routes.DOCUMENT,

@@ -269,6 +269,11 @@ public object Notifications : LongIdTable("notifications") {
 
     /** Čas vytvoření záznamu */
     public val createdAt: Column<Instant> = timestamp("created_at").defaultExpression(CurrentTimestamp)
+
+    init {
+        // Neunikátní index pro rychlé dotazy dle uživatele (list, unreadCount, markAllRead)
+        index(false, userId)
+    }
 }
 
 /** Znalostní dokumenty (RAG) */

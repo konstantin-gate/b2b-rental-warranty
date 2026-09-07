@@ -36,9 +36,17 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.time.LocalDate
 
-/** Služba pro správu nájemních smluv */
-public class ContractService {
-    /** Vytvoření nové smlouvy klientem (stav draft) */
+/** Služba pro správu nájemních smluv
+ * @property notificationService služba notifikací
+ */
+public class ContractService(
+    private val notificationService: NotificationService,
+) {
+    /**
+     * Vytvoření nové smlouvy klientem (stav draft)
+     * @param callerCompanyId id společnosti volajícího klienta
+     * @param req požadavek na vytvoření smlouvy
+     */
     public fun create(
         callerCompanyId: Long,
         req: ContractCreateRequest,
@@ -97,7 +105,11 @@ public class ContractService {
         }
     }
 
-    /** Seznam smluv dle role volajícího */
+    /**
+     * Seznam smluv dle role volajícího
+     * @param role role volajícího uživatele
+     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     */
     public fun list(
         role: String,
         callerCompanyId: Long?,
@@ -117,7 +129,12 @@ public class ContractService {
             query.map(::toResponse)
         }
 
-    /** Získání detailu smlouvy */
+    /**
+     * Získání detailu smlouvy
+     * @param id id smlouvy
+     * @param role role volajícího uživatele
+     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     */
     public fun get(
         id: ContractId,
         role: String,
@@ -134,7 +151,10 @@ public class ContractService {
             contract
         }
 
-    /** Schválení smlouvy manažerem/adminem: draft → active, vybavení → rented, graf plateb */
+    /**
+     * Schválení smlouvy manažerem/adminem: draft → active, vybavení → rented, graf plateb
+     * @param id id smlouvy
+     */
     public fun approve(id: ContractId): ContractActionResponse =
         transaction {
             val row =
@@ -177,10 +197,15 @@ public class ContractService {
                 }
             }
 
+            notificationService.notifyCompanyClients(row[RentalContracts.companyId].value, "Smlouva #${id.value} byla schválena")
+
             ContractActionResponse(id.value, ContractStatus.active, months)
         }
 
-    /** Zamítnutí smlouvy: draft → rejected */
+    /**
+     * Zamítnutí smlouvy: draft → rejected
+     * @param id id smlouvy
+     */
     public fun reject(id: ContractId): ContractActionResponse =
         transaction {
             val row =
@@ -198,10 +223,18 @@ public class ContractService {
                 it[status] = ContractStatus.rejected
             }
 
+            notificationService.notifyCompanyClients(row[RentalContracts.companyId].value, "Smlouva #${id.value} byla zamítnuta")
+
             ContractActionResponse(id.value, ContractStatus.rejected)
         }
 
-    /** Získání nebo vytvoření PDF dokumentu smlouvy */
+    /**
+     * Získání nebo vytvoření PDF dokumentu smlouvy
+     * @param id id smlouvy
+     * @param role role volajícího uživatele
+     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     * @param callerUserId id volajícího uživatele (autor dokumentu)
+     */
     public fun pdfDocument(
         id: ContractId,
         role: String,
@@ -209,7 +242,13 @@ public class ContractService {
         callerUserId: Long,
     ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.rental_contract, role, callerCompanyId, callerUserId)
 
-    /** Získání nebo vytvoření předávacího protokolu (akceptačního aktu) */
+    /**
+     * Získání nebo vytvoření předávacího protokolu (akceptačního aktu)
+     * @param id id smlouvy
+     * @param role role volajícího uživatele
+     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     * @param callerUserId id volajícího uživatele (autor dokumentu)
+     */
     public fun acceptanceActDocument(
         id: ContractId,
         role: String,
@@ -217,7 +256,13 @@ public class ContractService {
         callerUserId: Long,
     ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.acceptance_act, role, callerCompanyId, callerUserId)
 
-    /** Získání nebo vytvoření protokolu o vrácení zařízení */
+    /**
+     * Získání nebo vytvoření protokolu o vrácení zařízení
+     * @param id id smlouvy
+     * @param role role volajícího uživatele
+     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     * @param callerUserId id volajícího uživatele (autor dokumentu)
+     */
     public fun returnActDocument(
         id: ContractId,
         role: String,
@@ -228,6 +273,11 @@ public class ContractService {
     /**
      * Idempotentní získání nebo vytvoření záznamu dokumentu smlouvy.
      * Dokument lze generovat výhradně pro aktivní smlouvu; klient smí pouze dokumenty své společnosti.
+     * @param id id smlouvy
+     * @param docType typ generovaného dokumentu
+     * @param role role volajícího uživatele
+     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     * @param callerUserId id volajícího uživatele (autor dokumentu)
      */
     private fun createOrGetContractDoc(
         id: ContractId,
@@ -275,7 +325,10 @@ public class ContractService {
             DocumentPdfResponse(newDocId.value)
         }
 
-    /** Interní načtení smlouvy podle id */
+    /**
+     * Interní načtení smlouvy podle id
+     * @param contractIdValue id smlouvy
+     */
     private fun getInternal(contractIdValue: Long): ContractResponse {
         val row =
             RentalContracts
@@ -286,7 +339,11 @@ public class ContractService {
         return toResponse(row)
     }
 
-    /** Mapování řádku DB na odpověď o smlouvě */
+    /**
+     * Mapování řádku DB na odpověď o smlouvě
+     * @param row řádek výsledku dotazu na smlouvu
+     */
+    @Suppress("KDocMissingDocumentation")
     private fun toResponse(row: ResultRow): ContractResponse {
         val compId: Long = row[RentalContracts.companyId].value
         val compName: String =

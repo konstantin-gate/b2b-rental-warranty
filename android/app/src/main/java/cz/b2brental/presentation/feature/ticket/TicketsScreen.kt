@@ -50,6 +50,7 @@ public fun TicketsScreen(
     viewModel: TicketsViewModel,
     onTicketClick: (Long) -> Unit,
     onLogout: () -> Unit,
+    onNotificationsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -61,6 +62,7 @@ public fun TicketsScreen(
                 refreshEnabled = true,
                 onLogout = onLogout,
                 logoutEnabled = true,
+                onNotificationsClick = onNotificationsClick,
             )
         },
     ) { padding ->

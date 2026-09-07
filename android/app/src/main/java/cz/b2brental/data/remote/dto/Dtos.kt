@@ -6,7 +6,6 @@ import cz.b2brental.domain.model.PaymentStatus
 import cz.b2brental.domain.model.Severity
 import cz.b2brental.domain.model.TicketStatus
 import cz.b2brental.domain.model.WarrantyVerdict
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // --- AUTH ---
@@ -473,6 +472,31 @@ public data class ErrorDetailsDto(
  */
 @Serializable
 public data class ErrorResponseDto(
-    @SerialName("error")
     val error: ErrorDetailsDto,
+)
+
+// --- NOTIFICATIONS ---
+
+/**
+ * Notifikace uživatele z backendu.
+ * @param id ID notifikace
+ * @param message text notifikace
+ * @param isRead příznak přečtení
+ * @param createdAt čas vytvoření (ISO-8601)
+ */
+@Serializable
+public data class NotificationDto(
+    val id: Long,
+    val message: String,
+    val isRead: Boolean,
+    val createdAt: String,
+)
+
+/**
+ * Počet nepřečtených notifikací.
+ * @param count počet nepřečtených notifikací
+ */
+@Serializable
+public data class UnreadCountDto(
+    val count: Long,
 )

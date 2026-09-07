@@ -105,6 +105,18 @@ do bloku `environment` (`AI_ENABLED: ${AI_ENABLED}`, `AI_MODEL: ${AI_MODEL}`,
 `AI_BASE_URL: ${AI_BASE_URL}`); bez těchto hodnot backend při `AI_ENABLED=true`
 nenastartuje. Demo účty jsou stejné jako v sekci [Demo účty](#demo-účty).
 
+## API – notifikace
+
+Backend je jediným zdrojem notifikací. K dispozici jsou následující endpointy
+(notifikace uživatele, všechny role):
+
+| Metoda | Endpoint | Popis |
+|---|---|---|
+| GET | `/notifications` | seznam notifikací uživatele (parametr `unread=true` pro jen nepřečtené) |
+| GET | `/notifications/unread-count` | počet nepřečtených notifikací |
+| POST | `/notifications/{id}/read` | označení notifikace jako přečtené (pouze vlastník, jinak 404) |
+| POST | `/notifications/read-all` | označení všech notifikací jako přečtené |
+
 ## AI integrace
 
 - **Model:** lokální `llama-server` s OpenAI-kompatibilním API (jediný runtime poskytovatel LLM)

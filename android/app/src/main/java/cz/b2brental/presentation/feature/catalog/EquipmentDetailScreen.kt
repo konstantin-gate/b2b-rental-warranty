@@ -39,6 +39,7 @@ public fun EquipmentDetailScreen(
     equipmentId: Long,
     viewModel: EquipmentDetailViewModel,
     onAddToSelection: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -52,6 +53,7 @@ public fun EquipmentDetailScreen(
                 titleRes = R.string.equipment_detail_title,
                 onRefresh = { viewModel.retry() },
                 refreshEnabled = uiState.item != null,
+                onNotificationsClick = onNotificationsClick,
             )
         },
     ) { padding ->

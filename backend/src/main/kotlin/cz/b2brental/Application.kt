@@ -15,6 +15,7 @@ import cz.b2brental.routes.catalogRoutes
 import cz.b2brental.routes.contractRoutes
 import cz.b2brental.routes.dashboardRoutes
 import cz.b2brental.routes.documentRoutes
+import cz.b2brental.routes.notificationRoutes
 import cz.b2brental.routes.paymentRoutes
 import cz.b2brental.routes.ticketRoutes
 import cz.b2brental.routes.userRoutes
@@ -25,6 +26,7 @@ import cz.b2brental.services.ContractService
 import cz.b2brental.services.DashboardService
 import cz.b2brental.services.KnowledgeBaseService
 import cz.b2brental.services.KnowledgeIndexService
+import cz.b2brental.services.NotificationService
 import cz.b2brental.services.PaymentService
 import cz.b2brental.services.PdfService
 import cz.b2brental.services.TicketService
@@ -91,9 +93,10 @@ public fun Application.module(config: Config = Config.fromEnv()) {
     }
 
     val catalogService = CatalogService()
-    val contractService = ContractService()
+    val notificationService = NotificationService()
+    val contractService = ContractService(notificationService)
     val paymentService = PaymentService(Clock.systemDefaultZone())
-    val ticketService = TicketService(aiService, knowledgeBaseService)
+    val ticketService = TicketService(aiService, knowledgeBaseService, notificationService)
     val pdfService = PdfService()
     val dashboardService = DashboardService(paymentService, Clock.systemDefaultZone())
 
@@ -234,5 +237,6 @@ public fun Application.module(config: Config = Config.fromEnv()) {
         aiRoutes(aiService, dashboardService, knowledgeBaseService)
         dashboardRoutes(dashboardService)
         userRoutes()
+        notificationRoutes(notificationService)
     }
 }

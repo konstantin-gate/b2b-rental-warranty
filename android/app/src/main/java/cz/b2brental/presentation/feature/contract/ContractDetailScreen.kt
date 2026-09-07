@@ -48,6 +48,7 @@ public fun ContractDetailScreen(
     profile: UserProfile,
     viewModel: ContractDetailViewModel,
     onPdfRequested: (Long) -> Unit,
+    onNotificationsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -67,6 +68,7 @@ public fun ContractDetailScreen(
                 titleRes = R.string.contract_detail_title,
                 onRefresh = { viewModel.retry() },
                 refreshEnabled = uiState.contract != null,
+                onNotificationsClick = onNotificationsClick,
             )
         },
     ) { padding ->

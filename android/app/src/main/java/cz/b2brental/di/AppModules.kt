@@ -12,6 +12,7 @@ import cz.b2brental.data.repository.CatalogRepositoryImpl
 import cz.b2brental.data.repository.ContractRepositoryImpl
 import cz.b2brental.data.repository.DashboardRepositoryImpl
 import cz.b2brental.data.repository.AiRepositoryImpl
+import cz.b2brental.data.repository.NotificationRepositoryImpl
 import cz.b2brental.data.repository.PaymentRepositoryImpl
 import cz.b2brental.data.repository.TicketRepositoryImpl
 import cz.b2brental.data.repository.UserRepositoryImpl
@@ -20,6 +21,7 @@ import cz.b2brental.domain.repository.AuthRepository
 import cz.b2brental.domain.repository.CatalogRepository
 import cz.b2brental.domain.repository.ContractRepository
 import cz.b2brental.domain.repository.DashboardRepository
+import cz.b2brental.domain.repository.NotificationRepository
 import cz.b2brental.domain.repository.PaymentRepository
 import cz.b2brental.domain.repository.TicketRepository
 import cz.b2brental.domain.repository.UserRepository
@@ -38,6 +40,7 @@ import cz.b2brental.presentation.feature.assistant.AssistantViewModel
 import cz.b2brental.presentation.feature.dashboard.DashboardViewModel
 import cz.b2brental.presentation.feature.document.PdfViewerViewModel
 import cz.b2brental.presentation.feature.equipment.MyEquipmentViewModel
+import cz.b2brental.presentation.feature.notification.NotificationsViewModel
 import cz.b2brental.presentation.feature.payment.PaymentsViewModel
 import cz.b2brental.presentation.feature.ticket.ReportIssueViewModel
 import cz.b2brental.presentation.feature.ticket.ResolveTicketViewModel
@@ -74,6 +77,7 @@ public val repositoryModule: Module = module {
     single<DashboardRepository> { DashboardRepositoryImpl(get()) }
     single<AiRepository> { AiRepositoryImpl(get()) }
     single<UserRepository> { UserRepositoryImpl(get()) }
+    single<NotificationRepository> { NotificationRepositoryImpl(get()) }
 }
 
 /**
@@ -98,4 +102,5 @@ public val viewModelModule: Module = module {
     viewModelOf(::DashboardViewModel)
     viewModelOf(::AssistantViewModel)
     viewModelOf(::AdminCatalogViewModel)
+    viewModelOf(::NotificationsViewModel)
 }

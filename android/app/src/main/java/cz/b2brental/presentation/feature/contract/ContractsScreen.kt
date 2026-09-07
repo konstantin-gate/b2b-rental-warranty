@@ -43,6 +43,7 @@ public fun ContractsScreen(
     viewModel: ContractsViewModel,
     onContractClick: (Long) -> Unit,
     onLogout: () -> Unit,
+    onNotificationsClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -54,6 +55,7 @@ public fun ContractsScreen(
                 refreshEnabled = true,
                 onLogout = onLogout,
                 logoutEnabled = true,
+                onNotificationsClick = onNotificationsClick,
             )
         },
     ) { padding ->

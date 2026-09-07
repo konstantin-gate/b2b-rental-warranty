@@ -260,8 +260,9 @@
     <string name="error_admin_catalog_validation">Zkontrolujte kategorii (1–4), model, výrobní číslo a formát částek</string>
     <string name="notification_channel_name">Aktualizace servisních požadavků</string>
     <string name="notification_title">B2B Rental</string>
-    <string name="notification_text_new">Nové hlášení č. %1$d (%2$s)</string>
-    <string name="notification_text_changed">Hlášení č. %1$d: %2$s → %3$s</string>
+    <string name="notifications_title">Notifikace</string>
+    <string name="notifications_empty">Žádné notifikace</string>
+    <string name="notifications_mark_all_read">Označit vše jako přečtené</string>
     <string name="payment_period_label">Období %1$d</string>
     <string name="payment_due_date_label">Splatnost: %1$s</string>
     <string name="payment_paid_at_label">Zaplaceno: %1$s</string>

@@ -16,3 +16,17 @@ public data class UserProfile(
     val companyId: Long?,
     val email: String,
 )
+
+/**
+ * Notifikace uživatele v doménové vrstvě.
+ * @property id ID notifikace
+ * @property message text notifikace
+ * @property isRead příznak přečtení
+ * @property createdAt čas vytvoření (ISO-8601)
+ */
+public data class NotificationItem(
+    val id: Long,
+    val message: String,
+    val isRead: Boolean,
+    val createdAt: String,
+)
