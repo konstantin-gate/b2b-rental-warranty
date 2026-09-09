@@ -1,10 +1,14 @@
 package cz.b2brental.presentation.feature.catalog
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Checkbox
@@ -45,6 +51,9 @@ import cz.b2brental.presentation.components.LoadingIndicator
 import cz.b2brental.presentation.components.OfflineBanner
 import cz.b2brental.domain.model.UserProfile
 import cz.b2brental.domain.model.UserRole
+import cz.b2brental.presentation.theme.catalogCategoryColors
+import cz.b2brental.presentation.theme.catalogStatusAccent
+import cz.b2brental.presentation.theme.catalogStatusStripeWidth
 
 /**
  * Obrazovka katalogu vybavení — zobrazí seznam položek s filtry a výběrem pro smlouvu.
@@ -139,25 +148,69 @@ public fun CatalogScreen(
                         }
                     }
 
+                    // Sekce podle kategorií — položky uvnitř seřazeny: dostupné první, pak podle modelu.
+                    val sections: List<Pair<String, List<CatalogItemResponseDto>>> = uiState.items
+                        .groupBy { item -> item.categoryId }
+                        .toSortedMap()
+                        .map { entry ->
+                            val categoryName = entry.value.first().categoryName
+                            categoryName to entry.value.sortedWith(
+                                compareBy(
+                                    { item -> item.status != EquipmentStatus.AVAILABLE },
+                                    { item -> item.model },
+                                ),
+                            )
+                        }
+
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(uiState.items, key = { item -> item.id }) { item ->
-                            CatalogItemCard(
-                                item = item,
-                                isSelectable = profile.role == UserRole.CLIENT &&
-                                        item.status == EquipmentStatus.AVAILABLE,
-                                isSelected = item.id in uiState.selectedIds,
-                                onToggleSelection = { viewModel.toggleSelection(item.id) },
-                                onClick = { onEquipmentClick(item.id) },
-                            )
+                        sections.forEach { section ->
+                            val (categoryName, sectionItems) = section
+                            item(key = "header_$categoryName") {
+                                CatalogSectionHeader(title = categoryName)
+                            }
+                            items(sectionItems, key = { item -> item.id }) { item ->
+                                CatalogItemCard(
+                                    item = item,
+                                    isSelectable = profile.role == UserRole.CLIENT &&
+                                            item.status == EquipmentStatus.AVAILABLE,
+                                    isSelected = item.id in uiState.selectedIds,
+                                    onToggleSelection = { viewModel.toggleSelection(item.id) },
+                                    onClick = { onEquipmentClick(item.id) },
+                                )
+                            }
                         }
                     }
                 }
             }
         },
     )
+}
+
+/**
+ * Záhlaví sekce katalogu (název kategorie).
+ * @param title název kategorie
+ */
+@Composable
+private fun CatalogSectionHeader(title: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 4.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+        )
+    }
 }
 
 /**
@@ -176,52 +229,79 @@ private fun CatalogItemCard(
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
 ) {
+    val categoryColors = catalogCategoryColors(item.categoryId.toInt())
+    val statusAccent = if (item.status == EquipmentStatus.AVAILABLE) null else catalogStatusAccent(item.status)
+    val cardContainerColor = statusAccent?.container ?: categoryColors.container
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = cardContainerColor),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .height(IntrinsicSize.Min),
         ) {
-            if (isSelectable) {
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { onToggleSelection() },
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.model,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.serialNumber,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.categoryName,
-                    style = MaterialTheme.typography.bodySmall,
+            // Pruh kategorie na levém okraji karty.
+            Box(
+                modifier = Modifier
+                    .width(8.dp)
+                    .fillMaxHeight()
+                    .background(categoryColors.stripe),
+            )
+            // Druhý pruh stavu — jen pro nedostupné položky; šířka podle stavu (pronajato 4 dp, údržba 8 dp).
+            if (statusAccent != null) {
+                Box(
+                    modifier = Modifier
+                        .width(catalogStatusStripeWidth(item.status))
+                        .fillMaxHeight()
+                        .background(statusAccent.stripe),
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = cz.b2brental.domain.util.MoneyFormat.formatCzk(item.monthlyRate),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                StatusBadge(status = item.status)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isSelectable) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelection() },
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.model,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = item.serialNumber,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = item.categoryName,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = cz.b2brental.domain.util.MoneyFormat.formatCzk(item.monthlyRate),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    StatusBadge(status = item.status)
+                }
             }
         }
     }

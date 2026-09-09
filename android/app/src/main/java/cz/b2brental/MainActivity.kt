@@ -73,6 +73,11 @@ public fun AppRoot() {
         }
     }
 
+    // Reset vlajky po novém přihlášení — jinak by opakovaný login po odhlášení zůstal na přihlašovací obrazovce.
+    LaunchedEffect(session) {
+        if (session != null) forceLogout = false
+    }
+
     if (session != null && !forceLogout) {
         val navController = rememberNavController()
         val context = LocalContext.current

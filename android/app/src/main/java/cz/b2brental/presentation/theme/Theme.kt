@@ -3,6 +3,7 @@ package cz.b2brental.presentation.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 /** Barevné schéma aplikace B2B Rental — světlý režim Material3. */
 private val LightColorScheme = lightColorScheme()
@@ -14,8 +15,10 @@ private val LightColorScheme = lightColorScheme()
  */
 @Composable
 public fun B2bTheme(content: @Composable () -> Unit): Unit {
-    MaterialTheme(
-        colorScheme = LightColorScheme,
-        content = content
-    )
+    CompositionLocalProvider(LocalCatalogPalette provides LightCatalogPalette) {
+        MaterialTheme(
+            colorScheme = LightColorScheme,
+            content = content
+        )
+    }
 }
