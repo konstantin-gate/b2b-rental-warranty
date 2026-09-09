@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cz.b2brental.data.remote.ApiException
 import cz.b2brental.domain.model.ContractStatus
+import cz.b2brental.domain.model.EquipmentStatus
 import cz.b2brental.domain.repository.CatalogRepository
 import cz.b2brental.domain.repository.ContractRepository
 import cz.b2brental.presentation.util.ErrorType
@@ -14,14 +15,18 @@ import kotlinx.coroutines.launch
 
 /**
  * Položka vybavení přiřazená aktivní smlouvou.
- * @param equipmentId ID vybavení
- * @param model model vybavení
- * @param serialNumber výrobní číslo (načtené z katalogu, null = nezjištěno)
+ * @property equipmentId ID vybavení
+ * @property model model vybavení
+ * @property serialNumber výrobní číslo (načtené z katalogu, null = nezjištěno)
+ * @property categoryId id kategorie vybavení (0 = nezjištěno, karta dostane šedý fallback)
+ * @property status stav vybavení (AVAILABLE = bez druhého pruhu)
  */
 public data class MyEquipmentItem(
     val equipmentId: Long,
     val model: String,
     val serialNumber: String?,
+    val categoryId: Long,
+    val status: EquipmentStatus,
 )
 
 /**
@@ -76,12 +81,16 @@ public class MyEquipmentViewModel(
                             equipmentId = item.equipmentId,
                             model = item.model,
                             serialNumber = detail.serialNumber,
+                            categoryId = detail.categoryId,
+                            status = detail.status,
                         )
                     } catch (_: Exception) {
                         MyEquipmentItem(
                             equipmentId = item.equipmentId,
                             model = item.model,
                             serialNumber = null,
+                            categoryId = 0L,
+                            status = EquipmentStatus.AVAILABLE,
                         )
                     }
                 }

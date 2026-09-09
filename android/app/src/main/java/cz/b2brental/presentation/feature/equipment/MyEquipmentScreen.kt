@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -27,6 +26,7 @@ import cz.b2brental.presentation.components.EmptyState
 import cz.b2brental.presentation.components.ErrorBanner
 import cz.b2brental.presentation.components.LoadingIndicator
 import cz.b2brental.presentation.components.RefreshTopAppBar
+import cz.b2brental.presentation.components.StyledEquipmentCard
 
 /**
  * Obrazovka „Moje vybavení" — zobrazí vybavení z aktivních smluv.
@@ -90,10 +90,11 @@ public fun MyEquipmentScreen(
  */
 @Composable
 private fun EquipmentCard(item: MyEquipmentItem, onReportIssue: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+    StyledEquipmentCard(
+        categoryId = item.categoryId.toInt(),
+        status = item.status,
+        onClick = null,
+        modifier = Modifier.padding(horizontal = 16.dp),
     ) {
         Column(
             modifier = Modifier

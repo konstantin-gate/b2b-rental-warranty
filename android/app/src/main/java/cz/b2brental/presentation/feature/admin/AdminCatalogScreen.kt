@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +42,7 @@ import cz.b2brental.presentation.components.LoadingIndicator
 import cz.b2brental.presentation.components.MoneyText
 import cz.b2brental.presentation.components.OfflineBanner
 import cz.b2brental.presentation.components.RefreshTopAppBar
+import cz.b2brental.presentation.components.StyledEquipmentCard
 
 /**
  * Obrazovka správy katalogu (admin).
@@ -153,7 +153,11 @@ private fun AdminCatalogItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    StyledEquipmentCard(
+        categoryId = item.categoryId.toInt(),
+        status = item.status,
+        onClick = null,
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

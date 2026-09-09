@@ -1,14 +1,9 @@
 package cz.b2brental.presentation.feature.catalog
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,11 +42,9 @@ import cz.b2brental.presentation.components.EmptyState
 import cz.b2brental.presentation.components.ErrorBanner
 import cz.b2brental.presentation.components.LoadingIndicator
 import cz.b2brental.presentation.components.OfflineBanner
+import cz.b2brental.presentation.components.StyledEquipmentCard
 import cz.b2brental.domain.model.UserProfile
 import cz.b2brental.domain.model.UserRole
-import cz.b2brental.presentation.theme.catalogCategoryColors
-import cz.b2brental.presentation.theme.catalogStatusAccent
-import cz.b2brental.presentation.theme.catalogStatusStripeWidth
 
 /**
  * Obrazovka katalogu vybavení — zobrazí seznam položek s filtry a výběrem pro smlouvu.
@@ -229,79 +220,52 @@ private fun CatalogItemCard(
     onToggleSelection: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val categoryColors = catalogCategoryColors(item.categoryId.toInt())
-    val statusAccent = if (item.status == EquipmentStatus.AVAILABLE) null else catalogStatusAccent(item.status)
-    val cardContainerColor = statusAccent?.container ?: categoryColors.container
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = cardContainerColor),
+    StyledEquipmentCard(
+        categoryId = item.categoryId.toInt(),
+        status = item.status,
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 16.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Min),
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Pruh kategorie na levém okraji karty.
-            Box(
-                modifier = Modifier
-                    .width(8.dp)
-                    .fillMaxHeight()
-                    .background(categoryColors.stripe),
-            )
-            // Druhý pruh stavu — jen pro nedostupné položky; šířka podle stavu (pronajato 4 dp, údržba 8 dp).
-            if (statusAccent != null) {
-                Box(
-                    modifier = Modifier
-                        .width(catalogStatusStripeWidth(item.status))
-                        .fillMaxHeight()
-                        .background(statusAccent.stripe),
+            if (isSelectable) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelection() },
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.model,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = item.serialNumber,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = item.categoryName,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (isSelectable) {
-                    Checkbox(
-                        checked = isSelected,
-                        onCheckedChange = { onToggleSelection() },
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.model,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = item.serialNumber,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = item.categoryName,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = cz.b2brental.domain.util.MoneyFormat.formatCzk(item.monthlyRate),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    StatusBadge(status = item.status)
-                }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = cz.b2brental.domain.util.MoneyFormat.formatCzk(item.monthlyRate),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                StatusBadge(status = item.status)
             }
         }
     }

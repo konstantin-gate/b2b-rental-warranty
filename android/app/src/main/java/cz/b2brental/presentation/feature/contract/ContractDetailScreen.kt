@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -25,13 +24,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cz.b2brental.R
+import cz.b2brental.data.remote.dto.CatalogItemResponseDto
 import cz.b2brental.data.remote.dto.ContractItemDto
 import cz.b2brental.domain.model.ContractStatus
+import cz.b2brental.domain.model.EquipmentStatus
 import cz.b2brental.domain.model.UserRole
 import cz.b2brental.presentation.components.ErrorBanner
 import cz.b2brental.presentation.components.LoadingIndicator
 import cz.b2brental.presentation.components.MoneyText
 import cz.b2brental.presentation.components.RefreshTopAppBar
+import cz.b2brental.presentation.components.StyledEquipmentCard
 import cz.b2brental.domain.model.UserProfile
 
 /**
@@ -151,7 +153,7 @@ public fun ContractDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         contract.items.forEach { item ->
-                            ContractItemRow(item)
+                            ContractItemRow(item, uiState.equipmentDetails[item.equipmentId])
                         }
                     }
 
@@ -213,15 +215,17 @@ private fun MoneyRow(label: String, amount: String) {
 }
 
 /**
- * Řádek položky smlouvy.
+ * Řádek položky smlouvy ve schváleném barevném stylu katalogu.
  * @param item data položky
+ * @param detail detail pozice katalogu (null = detail se nepodařilo načíst)
  */
 @Composable
-private fun ContractItemRow(item: ContractItemDto) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+private fun ContractItemRow(item: ContractItemDto, detail: CatalogItemResponseDto?) {
+    StyledEquipmentCard(
+        categoryId = detail?.categoryId?.toInt() ?: 0,
+        status = detail?.status ?: EquipmentStatus.AVAILABLE,
+        onClick = null,
+        modifier = Modifier.padding(vertical = 4.dp),
     ) {
         Row(
             modifier = Modifier
