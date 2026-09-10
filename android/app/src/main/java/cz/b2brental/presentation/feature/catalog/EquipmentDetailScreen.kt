@@ -31,6 +31,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
  * Obrazovka detailu vybavení — zobrazí model, sériové číslo, cenu, sazbu a stav.
  * @param equipmentId ID vybavení z navigace
  * @param viewModel ViewModel detailu vybavení
+ * @param onNavigateBack callback pro návrat na předchozí obrazovku
  * @param onAddToSelection callback pro přidání do výběru (pouze client)
  */
 @Suppress("KDocMissingDocumentation")
@@ -38,6 +39,7 @@ import cz.b2brental.presentation.components.RefreshTopAppBar
 public fun EquipmentDetailScreen(
     equipmentId: Long,
     viewModel: EquipmentDetailViewModel,
+    onNavigateBack: () -> Unit,
     onAddToSelection: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
 ) {
@@ -51,6 +53,7 @@ public fun EquipmentDetailScreen(
         topBar = {
             RefreshTopAppBar(
                 titleRes = R.string.equipment_detail_title,
+                onNavigateBack = onNavigateBack,
                 onRefresh = { viewModel.retry() },
                 refreshEnabled = uiState.item != null,
                 onNotificationsClick = onNotificationsClick,

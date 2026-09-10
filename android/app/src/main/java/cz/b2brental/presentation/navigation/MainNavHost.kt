@@ -92,6 +92,7 @@ public fun MainNavHost(
                 EquipmentDetailScreen(
                     equipmentId = equipmentId,
                     viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
                     onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                 )
             }
@@ -105,6 +106,7 @@ public fun MainNavHost(
                 CreateContractScreen(
                     ids = ids,
                     viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
                     onContractCreated = { contractId ->
                         navController.navigate(Routes.contractDetail(contractId)) {
                             popUpTo(Routes.CATALOG) { inclusive = false }
@@ -133,6 +135,7 @@ public fun MainNavHost(
                     contractId = contractId,
                     profile = profile,
                     viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
                     onPdfRequested = { docId ->
                         navController.navigate(Routes.document(docId))
                     },
@@ -246,7 +249,11 @@ public fun MainNavHost(
             ) { backStackEntry ->
                 val documentId: Long = backStackEntry.arguments?.getLong("documentId") ?: return@composable
                 val viewModel: PdfViewerViewModel = koinViewModel()
-                PdfViewerScreen(documentId = documentId, viewModel = viewModel)
+                PdfViewerScreen(
+                    documentId = documentId,
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                )
             }
         }
     }

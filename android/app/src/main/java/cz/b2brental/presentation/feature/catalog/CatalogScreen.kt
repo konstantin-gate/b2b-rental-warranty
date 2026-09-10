@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
@@ -30,6 +31,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -53,7 +55,7 @@ import cz.b2brental.domain.model.UserRole
  * @param onEquipmentClick callback při kliknutí na položku (přechod na detail)
  * @param onCreateContract callback při kliknutí na FAB (přechod na vytvoření smlouvy)
  */
-@Suppress("KDocMissingDocumentation")
+@Suppress("KDocMissingDocumentation", "HardcodedStringLiteral")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun CatalogScreen(
@@ -118,18 +120,30 @@ public fun CatalogScreen(
                         .map { item -> item.categoryId to item.categoryName }
                         .distinctBy { pair -> pair.first }
 
+                    // Lokální filtrace bez opětovného načtení — přepnutí filtru nepřekresluje celou obrazovku.
+                    val visibleItems: List<CatalogItemResponseDto> = remember(
+                        uiState.items,
+                        uiState.activeCategoryId,
+                    ) {
+                        if (uiState.activeCategoryId == null) {
+                            uiState.items
+                        } else {
+                            uiState.items.filter { item -> item.categoryId == uiState.activeCategoryId }
+                        }
+                    }
+
                     LazyRow(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        item {
+                        item(key = "filter_all") {
                             FilterChip(
                                 selected = uiState.activeCategoryId == null,
                                 onClick = { viewModel.filterByCategory(null) },
                                 label = { Text(stringResource(R.string.catalog_filter_all)) },
                             )
                         }
-                        items(categories) { category ->
+                        items(categories, key = { pair -> pair.first }) { category ->
                             val (id, name) = category
                             FilterChip(
                                 selected = uiState.activeCategoryId == id,
@@ -140,20 +154,23 @@ public fun CatalogScreen(
                     }
 
                     // Sekce podle kategorií — položky uvnitř seřazeny: dostupné první, pak podle modelu.
-                    val sections: List<Pair<String, List<CatalogItemResponseDto>>> = uiState.items
-                        .groupBy { item -> item.categoryId }
-                        .toSortedMap()
-                        .map { entry ->
-                            val categoryName = entry.value.first().categoryName
-                            categoryName to entry.value.sortedWith(
-                                compareBy(
-                                    { item -> item.status != EquipmentStatus.AVAILABLE },
-                                    { item -> item.model },
-                                ),
-                            )
-                        }
+                    val sections: List<Pair<String, List<CatalogItemResponseDto>>> = remember(visibleItems) {
+                        visibleItems
+                            .groupBy { item -> item.categoryId }
+                            .toSortedMap()
+                            .map { entry ->
+                                val categoryName = entry.value.first().categoryName
+                                categoryName to entry.value.sortedWith(
+                                    compareBy(
+                                        { item -> item.status != EquipmentStatus.AVAILABLE },
+                                        { item -> item.model },
+                                    ),
+                                )
+                            }
+                    }
 
                     LazyColumn(
+                        state = rememberLazyListState(),
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -278,9 +295,14 @@ private fun CatalogItemCard(
 @Composable
 private fun StatusBadge(status: EquipmentStatus) {
     val (text, color) = when (status) {
-        EquipmentStatus.AVAILABLE -> stringResource(R.string.catalog_status_available) to MaterialTheme.colorScheme.primary
-        EquipmentStatus.RENTED -> stringResource(R.string.catalog_status_rented) to MaterialTheme.colorScheme.secondary
-        EquipmentStatus.MAINTENANCE -> stringResource(R.string.catalog_status_maintenance) to MaterialTheme.colorScheme.tertiary
+        EquipmentStatus.AVAILABLE ->
+            stringResource(R.string.catalog_status_available) to MaterialTheme.colorScheme.primary
+
+        EquipmentStatus.RENTED ->
+            stringResource(R.string.catalog_status_rented) to MaterialTheme.colorScheme.secondary
+
+        EquipmentStatus.MAINTENANCE ->
+            stringResource(R.string.catalog_status_maintenance) to MaterialTheme.colorScheme.tertiary
     }
     Text(
         text = text,

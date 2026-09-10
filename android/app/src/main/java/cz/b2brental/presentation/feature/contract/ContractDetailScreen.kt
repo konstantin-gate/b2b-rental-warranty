@@ -41,6 +41,7 @@ import cz.b2brental.domain.model.UserProfile
  * @param contractId ID smlouvy z navigace
  * @param profile profil přihlášeného uživatele
  * @param viewModel ViewModel detailu smlouvy
+ * @param onNavigateBack callback pro návrat na předchozí obrazovku
  * @param onPdfRequested callback pro otevření PDF prohlížeče
  */
 @Suppress("KDocMissingDocumentation")
@@ -49,6 +50,7 @@ public fun ContractDetailScreen(
     contractId: Long,
     profile: UserProfile,
     viewModel: ContractDetailViewModel,
+    onNavigateBack: () -> Unit,
     onPdfRequested: (Long) -> Unit,
     onNotificationsClick: () -> Unit,
 ) {
@@ -68,6 +70,7 @@ public fun ContractDetailScreen(
         topBar = {
             RefreshTopAppBar(
                 titleRes = R.string.contract_detail_title,
+                onNavigateBack = onNavigateBack,
                 onRefresh = { viewModel.retry() },
                 refreshEnabled = uiState.contract != null,
                 onNotificationsClick = onNotificationsClick,
@@ -99,7 +102,10 @@ public fun ContractDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(stringResource(R.string.contract_detail_status_label), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.contract_detail_status_label),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                         Text(
                             text = contract.status.name,
                             style = MaterialTheme.typography.bodyMedium,
@@ -113,7 +119,10 @@ public fun ContractDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(stringResource(R.string.contract_detail_period_label), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.contract_detail_period_label),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                         Text("${contract.startDate} — ${contract.endDate}")
                     }
 
@@ -123,7 +132,10 @@ public fun ContractDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(stringResource(R.string.contract_detail_months_label), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.contract_detail_months_label),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                         Text("${contract.months}")
                     }
 

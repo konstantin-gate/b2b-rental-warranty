@@ -5,7 +5,11 @@ import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -26,6 +30,7 @@ import cz.b2brental.presentation.components.LoadingIndicator
  * Obrazovka prohlížeče PDF — stáhne dokument a otevře externím prohlížečem.
  * @param documentId ID dokumentu z navigace
  * @param viewModel ViewModel prohlížeče PDF
+ * @param onNavigateBack callback pro návrat na předchozí obrazovku
  */
 @Suppress("KDocMissingDocumentation")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +38,7 @@ import cz.b2brental.presentation.components.LoadingIndicator
 public fun PdfViewerScreen(
     documentId: Long,
     viewModel: PdfViewerViewModel,
+    onNavigateBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -49,7 +55,12 @@ public fun PdfViewerScreen(
                     setDataAndType(uri, "application/pdf")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(intent, context.getString(R.string.pdf_viewer_chooser_title)))
+                context.startActivity(
+                    Intent.createChooser(
+                        intent,
+                        context.getString(R.string.pdf_viewer_chooser_title)
+                    )
+                )
             } catch (_: ActivityNotFoundException) {
                 viewModel.setNoApp()
             }
@@ -58,7 +69,17 @@ public fun PdfViewerScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.pdf_viewer_title)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.pdf_viewer_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_back),
+                        )
+                    }
+                },
+            )
         },
     ) { padding ->
         if (uiState.isDownloading) {

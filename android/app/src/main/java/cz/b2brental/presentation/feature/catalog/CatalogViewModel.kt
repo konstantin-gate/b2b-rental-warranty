@@ -38,6 +38,7 @@ public class CatalogViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CatalogUiState())
+
     /** Aktuální UI stav katalogu. */
     public val uiState: StateFlow<CatalogUiState> = _uiState.asStateFlow()
 
@@ -46,13 +47,14 @@ public class CatalogViewModel(
     }
 
     /**
-     * Načte katalog z API (s offline fallbackem).
+     * Načte katalog z API (s offline fallbackem). Vždy načte celý katalog —
+     * filtrace kategorií probíhá lokálně, aby přepnutí filtru nepřekreslovalo celou obrazovku.
      */
     public fun loadCatalog(): Unit {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val result = catalogRepository.list(_uiState.value.activeCategoryId, null)
+                val result = catalogRepository.list(null, null)
                 _uiState.value = _uiState.value.copy(
                     items = result.items,
                     isLoading = false,
@@ -73,12 +75,11 @@ public class CatalogViewModel(
     }
 
     /**
-     * Nastaví aktivní filtr kategorie a znovu načte katalog.
+     * Nastaví aktivní filtr kategorie. Katalog se znovu nenačítá — položky se filtrují lokálně.
      * @param categoryId ID kategorie (null = bez filtru)
      */
     public fun filterByCategory(categoryId: Long?): Unit {
         _uiState.value = _uiState.value.copy(activeCategoryId = categoryId)
-        loadCatalog()
     }
 
     /**

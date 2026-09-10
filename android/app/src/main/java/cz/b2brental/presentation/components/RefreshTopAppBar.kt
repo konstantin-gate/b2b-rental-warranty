@@ -3,6 +3,7 @@
 package cz.b2brental.presentation.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
@@ -22,6 +23,7 @@ import cz.b2brental.R
  * a «Mé vybavení»: titulek z `strings.xml` a akce s ikonou Refresh.
  *
  * @param titleRes ID resource řetězce s titulkem obrazovky
+ * @param onNavigateBack callback pro návrat na předchozí obrazovku (null = šipka zpět skryta)
  * @param onRefresh callback pro akci «Obnovit»
  * @param refreshEnabled zda se má tlačítko «Obnovit» vůbec zobrazit (např. před načtením dat)
  * @param onLogout callback pro akci «Odhlásit se» (null = tlačítko skryto)
@@ -33,6 +35,7 @@ import cz.b2brental.R
 @Composable
 public fun RefreshTopAppBar(
     titleRes: Int,
+    onNavigateBack: (() -> Unit)? = null,
     onRefresh: () -> Unit,
     refreshEnabled: Boolean,
     onLogout: (() -> Unit)? = null,
@@ -40,6 +43,16 @@ public fun RefreshTopAppBar(
     onNotificationsClick: (() -> Unit)? = null,
 ) {
     TopAppBar(
+        navigationIcon = {
+            if (onNavigateBack != null) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.common_back),
+                    )
+                }
+            }
+        },
         title = { Text(stringResource(titleRes)) },
         actions = {
             if (onNotificationsClick != null) {

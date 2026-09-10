@@ -11,10 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,6 +49,7 @@ import java.time.format.DateTimeFormatter
  * Obrazovka vytvoření nájemní smlouvy — formulář s výběrem data, měsíců a adresy.
  * @param ids seznam ID vybraných položek z navigace
  * @param viewModel ViewModel pro vytvoření smlouvy
+ * @param onNavigateBack callback pro návrat na předchozí obrazovku
  * @param onContractCreated callback po úspěšném vytvoření (přechod na detail)
  */
 @Suppress("KDocMissingDocumentation")
@@ -53,6 +58,7 @@ import java.time.format.DateTimeFormatter
 public fun CreateContractScreen(
     ids: List<Long>,
     viewModel: CreateContractViewModel,
+    onNavigateBack: () -> Unit,
     onContractCreated: (Long) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -71,7 +77,17 @@ public fun CreateContractScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.contract_new_title)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.contract_new_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_back),
+                        )
+                    }
+                },
+            )
         },
     ) { padding ->
         if (uiState.isLoading) {

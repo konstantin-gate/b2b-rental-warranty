@@ -60,9 +60,8 @@ public fun B2bBottomNavBar(
                 onClick = {
                     if (currentRoute != item.route) {
                         navController.navigate(item.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
                             launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 },
@@ -86,12 +85,14 @@ private fun buildItems(role: UserRole): List<BottomNavItem> = when (role) {
         BottomNavItem(Routes.TICKETS, R.string.nav_tickets, Icons.Filled.Build),
         BottomNavItem(Routes.PAYMENTS, R.string.nav_payments, Icons.Filled.Payments),
     )
+
     UserRole.MANAGER -> listOf(
         BottomNavItem(Routes.DASHBOARD, R.string.nav_dashboard, Icons.Filled.Assessment),
         BottomNavItem(Routes.CONTRACTS, R.string.nav_contracts, Icons.AutoMirrored.Filled.List),
         BottomNavItem(Routes.TICKETS, R.string.nav_tickets, Icons.Filled.Build),
         BottomNavItem(Routes.ASSISTANT, R.string.nav_assistant, Icons.Filled.SmartToy),
     )
+
     UserRole.ADMIN -> listOf(
         BottomNavItem(Routes.DASHBOARD, R.string.nav_dashboard, Icons.Filled.Assessment),
         BottomNavItem(Routes.CONTRACTS, R.string.nav_contracts, Icons.AutoMirrored.Filled.List),
@@ -99,6 +100,7 @@ private fun buildItems(role: UserRole): List<BottomNavItem> = when (role) {
         BottomNavItem(Routes.ADMIN_CATALOG, R.string.nav_admin_catalog, Icons.Filled.Inventory),
         BottomNavItem(Routes.ASSISTANT, R.string.nav_assistant, Icons.Filled.SmartToy),
     )
+
     UserRole.TECHNICIAN -> listOf(
         BottomNavItem(Routes.TICKETS, R.string.nav_tickets, Icons.Filled.Build),
     )
