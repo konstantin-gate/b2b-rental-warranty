@@ -18,16 +18,29 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
 
-        @Suppress("HardCodedStringLiteral")
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8090/\"")
+    signingConfigs {
+        create("release") {
+            @Suppress("HardCodedStringLiteral")
+            storeFile = file(System.getenv("B2B_STORE_FILE") ?: "keystore/release.keystore")
+            storePassword = System.getenv("B2B_STORE_PASSWORD")
+            keyAlias = System.getenv("B2B_KEY_ALIAS")
+            keyPassword = System.getenv("B2B_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
+        debug {
+            @Suppress("HardCodedStringLiteral")
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8090/\"")
+        }
         release {
             isMinifyEnabled = false
             @Suppress("HardCodedStringLiteral")
-            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "API_BASE_URL", "\"https://b2b-rental.cz/\"")
+            @Suppress("HardCodedStringLiteral")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 @Suppress("HardCodedStringLiteral")
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -87,9 +100,6 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-
-    // DataStore
-    implementation(libs.datastore.preferences)
 
     // Room
     implementation(libs.room.runtime)

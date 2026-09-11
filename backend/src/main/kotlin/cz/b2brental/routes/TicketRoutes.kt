@@ -20,7 +20,9 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
-/** Registrace tras pro servisní požadavky */
+/** Registrace tras pro servisní požadavky.
+ * @param service služba pro operace s tiketovými požadavky (create, list, get, assign, start, resolve, pdfDocument).
+ */
 public fun Route.ticketRoutes(service: TicketService) {
     route("/tickets") {
         authenticate("auth-jwt") {
@@ -38,7 +40,7 @@ public fun Route.ticketRoutes(service: TicketService) {
             get {
                 call.requireRole("client", "technician", "manager", "admin")
                 val ctx = call.callerContext()
-                call.respond(service.list(ctx.userId, ctx.role, ctx.companyId))
+                call.respond(service.list(ctx.userId, ctx.role, ctx.companyId, ctx.scope))
             }
 
             get("/{id}") {
@@ -47,7 +49,7 @@ public fun Route.ticketRoutes(service: TicketService) {
                     call.parameters["id"]?.toLongOrNull()?.let(::TicketId)
                         ?: throw BadRequestException("Neplatné id požadavku")
                 val ctx = call.callerContext()
-                call.respond(service.get(id, ctx.userId, ctx.role, ctx.companyId))
+                call.respond(service.get(id, ctx.userId, ctx.role, ctx.companyId, ctx.scope))
             }
 
             post("/{id}/assign") {
@@ -57,7 +59,7 @@ public fun Route.ticketRoutes(service: TicketService) {
                         ?: throw BadRequestException("Neplatné id požadavku")
                 val ctx = call.callerContext()
                 val req = call.receive<AssignRequest>()
-                call.respond(service.assign(id, ctx.userId, req))
+                call.respond(service.assign(id, ctx.userId, req, ctx.companyId, ctx.scope))
             }
 
             post("/{id}/start") {
@@ -85,7 +87,7 @@ public fun Route.ticketRoutes(service: TicketService) {
                     call.parameters["id"]?.toLongOrNull()
                         ?: throw BadRequestException("Neplatné id tiketu")
                 val ctx = call.callerContext()
-                call.respond(HttpStatusCode.OK, service.pdfDocument(id, ctx.role, ctx.companyId, ctx.userId))
+                call.respond(HttpStatusCode.OK, service.pdfDocument(id, ctx.role, ctx.companyId, ctx.userId, ctx.scope))
             }
         }
     }

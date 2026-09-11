@@ -32,7 +32,7 @@ class HealthFlowTest {
     @Test
     fun dashboardClientForbiddenTest(): Unit =
         withB2bTestApp("dashboard-forbidden-flow") {
-            val clientToken = login("kitchen@b2b.demo", "kitchen123")
+            val clientToken = login("kitchen@b2b.demo", "kitchen1234abcd")
             val resp =
                 client.get("/dashboard") {
                     header(HttpHeaders.Authorization, "Bearer $clientToken")

@@ -91,10 +91,10 @@ Na snímky vyžadují spuštěné zařízení/emulátor — jsou přidávány ru
 
 | Role | E-mail | Heslo |
 |---|---|---|
-| admin | admin@b2b.demo | admin123 |
-| manager | manager@b2b.demo | manager123 |
-| technician | tech@b2b.demo | tech123 |
-| client | kitchen@b2b.demo | kitchen123 |
+| admin | admin@b2b.demo | admin1234abcd |
+| manager | manager@b2b.demo | manager1234abcd |
+| technician | tech@b2b.demo | tech12345abcd |
+| client | kitchen@b2b.demo | kitchen1234abcd |
 
 ## Spuštění backendu lokálně
 
@@ -165,6 +165,10 @@ do bloku `environment` (`AI_ENABLED: ${AI_ENABLED}`, `AI_MODEL: ${AI_MODEL}`,
 `AI_BASE_URL: ${AI_BASE_URL}`); bez těchto hodnot backend při `AI_ENABLED=true`
 nenastartuje. Demo účty jsou stejné jako v sekci [Demo účty](#demo-účty).
 
+### Naplnění demo dat
+
+Proměnná `SEED_DEMO_DATA` řídí, zda backend při startu naplní databázi demo daty (uživatelé, vybavení, smlouvy, tikety). Výchozí hodnota v aplikaci je `false` — bez explicitního nastavení se demo data nevytvoří. V `docker-compose.yml` je hodnota povinná (`${SEED_DEMO_DATA:?err}`) a `.env` pro demo nastavuje `SEED_DEMO_DATA=true`. Pro produkci nastavte `SEED_DEMO_DATA=false`. Demo účty (viz sekce [Demo účty](#demo-účty)) existují pouze při `SEED_DEMO_DATA=true`.
+
 ## API – notifikace
 
 Backend je jediným zdrojem notifikací. K dispozici jsou následující endpointy
@@ -177,6 +181,12 @@ Backend je jediným zdrojem notifikací. K dispozici jsou následující endpoin
 | POST | `/notifications/{id}/read` | označení notifikace jako přečtené (pouze vlastník, jinak 404) |
 | POST | `/notifications/read-all` | označení všech notifikací jako přečtené |
 
+Notifikace pro manažery/adminy se zapisují pouze platformovému personálu (uživatelé bez firmy, `users.company_id IS NULL`); klienti firmy dostávají notifikace o svých smlouvách a tiketech.
+
+## Seznam techniků (GET /users)
+
+Endpoint `GET /users?role=technician` je přístupný manažerům a administrátorům platformy i firmy. E-mail je maskován ve formátu `první 2 znaky***@doména`, telefon — konstanta `***`.
+
 ## AI integrace
 
 - **Model:** lokální `llama-server` s OpenAI-kompatibilním API (jediný runtime poskytovatel LLM)
@@ -184,3 +194,49 @@ Backend je jediným zdrojem notifikací. K dispozici jsou následující endpoin
 - **Volání:** probíhá přes backend (`/ai/diagnose`, `/ai/warranty-check`, `/ai/assistant`); HTTP komunikaci zajišťuje `OpenAiCompatibleLlmClient` s limitem délky vstupu, omezenými opakováními (timeout, chyba spojení, HTTP 429/5xx) a odstraněním bloků `<think>` z odpovědi
 - **Fallback:** pokud je `AI_ENABLED=false` nebo llama-server nedostupný, vrací se deterministická odpověď bez pádu serveru
 - **Bezpečnost:** přístupové údaje k LLM jsou pouze na backendu, nikdy se nedostanou do Android aplikace ani do gitu; obsah promptů a klíče se nelogují
+
+## Zabezpečení v produkci
+
+### TLS (HTTPS)
+
+Backend sám neposkytuje TLS — ukončení TLS zajišťuje reverse proxy (nginx). Nginx přijímá přes HTTPS a proxyuje na backend:
+
+```
+server {
+    listen 443 ssl;
+    server_name b2b-rental.cz;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        proxy_pass http://backend:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### JWT_SECRET
+
+`JWT_SECRET` musí mít alespoň 32 znaků. V produkci generujte klíč přes:
+```bash
+openssl rand -hex 32
+```
+
+Neúspěšné pokusy o přihlášení se ukládají do tabulky `login_attempts` a aktivní blokace do `login_blocks` (limit 5 pokusů / 15 minut, blokace 15 minut, HTTP 429). Odvolané tokeny se ukládají do `revoked_tokens`, takže odhlášení platí i po restartu backendu. Android klient při odhlášení volá `POST /auth/logout`, takže token je zneplatněn i na serveru. Backend odmítá JWT tokeny bez claim `exp`.
+
+### Android release signing
+
+Release build vyžaduje proměnné prostředí:
+
+| Proměnná | Popis |
+|---|---|
+| `B2B_STORE_FILE` | Cesta k keystoru (výchozí: `keystore/release.keystore`) |
+| `B2B_STORE_PASSWORD` | Heslo keystore |
+| `B2B_KEY_ALIAS` | Alias klíče |
+| `B2B_KEY_PASSWORD` | Heslo klíče |
+
+Bez nastavení těchto proměnných release build selže. Debug build není ovlivněn.

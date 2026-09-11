@@ -10,14 +10,15 @@ import cz.b2brental.data.remote.SessionClearer
 import cz.b2brental.data.remote.createB2bHttpClient
 import cz.b2brental.data.repository.AuthRepositoryImpl
 import cz.b2brental.domain.model.UserProfile
+import cz.b2brental.domain.model.UserRole
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondError
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
@@ -30,7 +31,7 @@ import org.junit.Test
 /** Fake implementace TokenStorage pro testy. */
 private class FakeTokenStorage : TokenStorage {
     private val _session = MutableStateFlow<UserProfile?>(null)
-    override val session: Flow<UserProfile?> = _session
+    override val session: StateFlow<UserProfile?> = _session
     private var storedToken: String? = null
 
     override suspend fun currentToken(): String? = storedToken
@@ -46,11 +47,12 @@ private class FakeTokenStorage : TokenStorage {
     }
 }
 
-/** Fake implementace SessionClearer pro testy. */
-private class FakeSessionClearer : SessionClearer {
+/** Fake implementace SessionClearer pro testy — simuluje produkční mazání session. */
+private class FakeSessionClearer(private val tokenStorage: TokenStorage) : SessionClearer {
     var calledCount: Int = 0
     override suspend fun clearSession(): Unit {
         calledCount++
+        tokenStorage.clear()
     }
 }
 
@@ -68,7 +70,7 @@ public class AuthRepositoryTest {
     @Before
     public fun setup(): Unit {
         fakeTokenStorage = FakeTokenStorage()
-        fakeSessionClearer = FakeSessionClearer()
+        fakeSessionClearer = FakeSessionClearer(fakeTokenStorage)
     }
 
     @Test
@@ -80,12 +82,13 @@ public class AuthRepositoryTest {
                     status = HttpStatusCode.OK,
                     headers = headersOf("Content-Type", ContentType.Application.Json.toString())
                 )
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
 
         val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
-        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
 
         repository.login("test@test.com", "password123")
 
@@ -105,12 +108,13 @@ public class AuthRepositoryTest {
                     status = HttpStatusCode.Unauthorized,
                     headers = headersOf("Content-Type", ContentType.Application.Json.toString())
                 )
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
 
         val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
-        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
 
         try {
             repository.login("wrong@test.com", "wrongpass")
@@ -128,7 +132,7 @@ public class AuthRepositoryTest {
         }
 
         val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
-        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
 
         try {
             repository.login("test@test.com", "password123")
@@ -147,17 +151,19 @@ public class AuthRepositoryTest {
                     status = HttpStatusCode.Created,
                     headers = headersOf("Content-Type", ContentType.Application.Json.toString())
                 )
+
                 "/auth/login" -> respond(
                     content = """{"token":"reg-token","userId":3,"role":"admin","companyId":2,"email":"admin@test.com"}""",
                     status = HttpStatusCode.OK,
                     headers = headersOf("Content-Type", ContentType.Application.Json.toString())
                 )
+
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
 
         val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
-        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
 
         repository.registerCompany(
             companyName = "Test Corp",
@@ -172,5 +178,77 @@ public class AuthRepositoryTest {
         assertNotNull(session)
         assertEquals("reg-token", session?.token)
         assertEquals(3L, session?.userId)
+    }
+
+    @Test
+    public fun `logout invalidates token on server and clears session`(): TestResult = runTest {
+        fakeTokenStorage.save(
+            UserProfile(
+                token = "test-token",
+                userId = 1L,
+                role = UserRole.CLIENT,
+                companyId = 1L,
+                email = "test@test.com",
+            )
+        )
+        var requestedPath: String? = null
+        val mockEngine = MockEngine { request ->
+            requestedPath = request.url.encodedPath
+            respond(
+                content = """{"status":"ok"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf("Content-Type", ContentType.Application.Json.toString())
+            )
+        }
+        val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
+
+        repository.logout()
+
+        assertEquals("/auth/logout", requestedPath)
+        assertEquals(1, fakeSessionClearer.calledCount)
+        assertEquals(null, fakeTokenStorage.session.first())
+    }
+
+    @Test
+    public fun `logout clears session when server returns error`(): TestResult = runTest {
+        fakeTokenStorage.save(
+            UserProfile(
+                token = "test-token",
+                userId = 1L,
+                role = UserRole.CLIENT,
+                companyId = 1L,
+                email = "test@test.com",
+            )
+        )
+        val mockEngine = MockEngine { respondError(HttpStatusCode.InternalServerError) }
+        val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
+
+        repository.logout()
+
+        assertEquals(1, fakeSessionClearer.calledCount)
+        assertEquals(null, fakeTokenStorage.session.first())
+    }
+
+    @Test
+    public fun `logout clears session when server is unavailable`(): TestResult = runTest {
+        fakeTokenStorage.save(
+            UserProfile(
+                token = "test-token",
+                userId = 1L,
+                role = UserRole.CLIENT,
+                companyId = 1L,
+                email = "test@test.com",
+            )
+        )
+        val mockEngine = MockEngine { throw java.io.IOException("Connection refused") }
+        val apiClient = B2bApiClient(createB2bHttpClient(mockEngine), fakeTokenStorage, fakeSessionClearer)
+        val repository = AuthRepositoryImpl(apiClient, fakeTokenStorage, fakeSessionClearer)
+
+        repository.logout()
+
+        assertEquals(1, fakeSessionClearer.calledCount)
+        assertEquals(null, fakeTokenStorage.session.first())
     }
 }

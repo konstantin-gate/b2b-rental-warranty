@@ -8,25 +8,20 @@ import cz.b2brental.data.remote.B2bApiClient
 import cz.b2brental.data.remote.SessionClearer
 import cz.b2brental.data.remote.createB2bHttpClient
 import cz.b2brental.domain.model.UserProfile
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.headersOf
-import kotlinx.coroutines.flow.Flow
+import io.ktor.client.engine.mock.*
+import io.ktor.http.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.fail
+import org.junit.Assert.*
 import org.junit.Test
 
 /** Fake implementace TokenStorage pro testy API klienta. */
 private class FakeTokenStorageForApi : TokenStorage {
     private val _session = MutableStateFlow<UserProfile?>(null)
-    override val session: Flow<UserProfile?> = _session
+    override val session: StateFlow<UserProfile?> = _session
     private var storedToken: String? = "test-token"
 
     override suspend fun currentToken(): String? = storedToken

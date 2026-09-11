@@ -18,6 +18,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -153,7 +154,7 @@ class CatalogRepositoryTest {
      */
     private class FakeTestTokenStorage : TokenStorage {
         private val _session = MutableStateFlow<UserProfile?>(null)
-        override val session: Flow<UserProfile?> = _session
+        override val session: StateFlow<UserProfile?> = _session
 
         @Suppress("RedundantNullableReturnType")
         override suspend fun currentToken(): String? = "test-token"

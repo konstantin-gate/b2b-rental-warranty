@@ -26,7 +26,7 @@ class EndToEndScenarioTest {
     fun fullScenarioEndToEndTest(): Unit =
         withB2bTestApp("e2e-scenario") {
             // Krok 1: přihlášení klienta
-            val clientToken = login("kitchen@b2b.demo", "kitchen123")
+            val clientToken = login("kitchen@b2b.demo", "kitchen1234abcd")
 
             // Krok 2: čtení katalogu a hledání první dostupné položky
             val catalogResp =
@@ -70,7 +70,7 @@ class EndToEndScenarioTest {
                     ?: error("Nezdařilo se přečíst id smlouvy z odpovědi")
 
             // Krok 4: přihlášení manažera
-            val managerToken = login("manager@b2b.demo", "manager123")
+            val managerToken = login("manager@b2b.demo", "manager1234abcd")
 
             // Krok 5: schválení smlouvy manažerem
             val approveResp =
@@ -103,7 +103,7 @@ class EndToEndScenarioTest {
             assertTrue(downloadResp.bodyAsText().startsWith("%PDF"))
 
             // Krok 8: opětovné přihlášení klienta a vytvoření tiketu na pronajaté vybavení
-            val clientTokenAgain = login("kitchen@b2b.demo", "kitchen123")
+            val clientTokenAgain = login("kitchen@b2b.demo", "kitchen1234abcd")
             val createTicketResp =
                 client.post("/tickets") {
                     header(HttpHeaders.Authorization, "Bearer $clientTokenAgain")
@@ -147,7 +147,7 @@ class EndToEndScenarioTest {
             assertEquals(HttpStatusCode.OK, assignResp.status)
             assertTrue(assignResp.bodyAsText().contains("\"status\":\"assigned\""))
 
-            val techToken = login("tech@b2b.demo", "tech123")
+            val techToken = login("tech@b2b.demo", "tech12345abcd")
 
             val startResp =
                 client.post("/tickets/$ticketId/start") {
@@ -166,7 +166,7 @@ class EndToEndScenarioTest {
             assertTrue(resolveResp.bodyAsText().contains("\"status\":\"resolved\""))
 
             // Krok 10: ověření vyřešeného tiketu klientem a dashboardu manažerem
-            val clientTokenThird = login("kitchen@b2b.demo", "kitchen123")
+            val clientTokenThird = login("kitchen@b2b.demo", "kitchen1234abcd")
             val ticketDetailResp =
                 client.get("/tickets/$ticketId") {
                     header(HttpHeaders.Authorization, "Bearer $clientTokenThird")
@@ -174,7 +174,7 @@ class EndToEndScenarioTest {
             assertEquals(HttpStatusCode.OK, ticketDetailResp.status)
             assertTrue(ticketDetailResp.bodyAsText().contains("\"status\":\"resolved\""))
 
-            val managerTokenAgain = login("manager@b2b.demo", "manager123")
+            val managerTokenAgain = login("manager@b2b.demo", "manager1234abcd")
             val dashboardResp =
                 client.get("/dashboard") {
                     header(HttpHeaders.Authorization, "Bearer $managerTokenAgain")

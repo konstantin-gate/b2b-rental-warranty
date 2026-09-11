@@ -2,6 +2,7 @@
 
 package cz.b2brental.services
 
+import cz.b2brental.auth.JwtService
 import cz.b2brental.db.Companies
 import cz.b2brental.db.ContractItems
 import cz.b2brental.db.ContractStatus
@@ -14,7 +15,6 @@ import cz.b2brental.db.ServiceTickets
 import cz.b2brental.db.Users
 import cz.b2brental.db.WarrantyRules
 import cz.b2brental.domain.ContractId
-import cz.b2brental.utils.ForbiddenException
 import cz.b2brental.utils.NotFoundException
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -55,7 +55,7 @@ class ContractServiceTest {
     @Test
     fun listEmptyTest() {
         val service = ContractService(NotificationService())
-        val result = service.list("admin", null)
+        val result = service.list("admin", null, JwtService.SCOPE_PLATFORM)
         assertEquals(0, result.size)
     }
 
@@ -63,7 +63,7 @@ class ContractServiceTest {
     fun pdfDocumentNotFoundTest() {
         val service = ContractService(NotificationService())
         assertFailsWith<NotFoundException> {
-            service.pdfDocument(ContractId(99999), "admin", null, 1L)
+            service.pdfDocument(ContractId(99999), "admin", null, 1L, JwtService.SCOPE_PLATFORM)
         }
     }
 
@@ -92,8 +92,8 @@ class ContractServiceTest {
             }
 
         val service = ContractService(NotificationService())
-        assertFailsWith<ForbiddenException> {
-            service.pdfDocument(ContractId(contractId), "client", 9999L, 1L)
+        assertFailsWith<NotFoundException> {
+            service.pdfDocument(ContractId(contractId), "client", 9999L, 1L, JwtService.SCOPE_TENANT)
         }
     }
 

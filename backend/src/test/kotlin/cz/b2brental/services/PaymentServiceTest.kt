@@ -2,6 +2,7 @@
 
 package cz.b2brental.services
 
+import cz.b2brental.auth.JwtService
 import cz.b2brental.db.Companies
 import cz.b2brental.db.ContractStatus
 import cz.b2brental.db.PaymentStatus
@@ -102,12 +103,12 @@ class PaymentServiceTest {
             assertEquals(PaymentStatus.unpaid, p2[Payments.status])
         }
 
-        val actionRes = service.pay(PaymentId(overduePaymentId), "manager", null)
+        val actionRes = service.pay(PaymentId(overduePaymentId), "manager", null, JwtService.SCOPE_PLATFORM)
         assertEquals(PaymentStatus.paid, actionRes.status)
         assertNotNull(actionRes.paidAt)
 
         assertFailsWith<ConflictException> {
-            service.pay(PaymentId(overduePaymentId), "manager", null)
+            service.pay(PaymentId(overduePaymentId), "manager", null, JwtService.SCOPE_PLATFORM)
         }
     }
 }

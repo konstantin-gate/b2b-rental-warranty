@@ -28,27 +28,34 @@ public fun withB2bTestApp(
                 // by způsobil, že module() zapíše schéma do cizí databáze; pin se proto resetuje,
                 // aby transaction{} znovu přebral posledně registrovanou databázi modulu.
                 TransactionManager.resetCurrent(null)
-                module(
-                    Config(
-                        dbUrl = "jdbc:h2:mem:$dbName;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-                        dbUser = "sa",
-                        dbPass = "",
-                        jwtSecret = "test-secret-32-znaku-minimum-pro-hs256",
-                        aiBaseUrl = "http://127.0.0.1:8080/v1",
-                        aiModel = "test-model",
-                        aiApiKey = null,
-                        aiRequestTimeoutMillis = 30000L,
-                        aiConnectTimeoutMillis = 5000L,
-                        aiMaxRetries = 0,
-                        aiMaxOutputTokens = 700,
-                        aiEnabled = false,
-                    ),
-                )
+                module(testConfig(dbName))
             }
             block()
         }
     }
 }
+
+/**
+ * Sestaví konfiguraci testovací aplikace s in-memory databází H2.
+ * @param dbName název in-memory databáze H2
+ * @return konfigurace aplikace pro testy
+ */
+public fun testConfig(dbName: String): Config =
+    Config(
+        dbUrl = "jdbc:h2:mem:$dbName;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+        dbUser = "sa",
+        dbPass = "",
+        jwtSecret = "test-secret-32-znaku-minimum-pro-hs256",
+        aiBaseUrl = "http://127.0.0.1:8080/v1",
+        aiModel = "test-model",
+        aiApiKey = null,
+        aiRequestTimeoutMillis = 30000L,
+        aiConnectTimeoutMillis = 5000L,
+        aiMaxRetries = 0,
+        aiMaxOutputTokens = 700,
+        aiEnabled = false,
+        seedDemoData = true,
+    )
 
 public suspend fun ApplicationTestBuilder.login(
     email: String,

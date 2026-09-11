@@ -19,6 +19,11 @@ local.properties
 .DS_Store
 Thumbs.db
 
+# Release keystores
+android/app/keystore/
+*.keystore
+*.jks
+
 # Memory bank (AI agent working directory)
 .memory_bank/
 .postman/

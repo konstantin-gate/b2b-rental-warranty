@@ -4,6 +4,8 @@ package cz.b2brental
 
 import com.auth0.jwt.algorithms.Algorithm
 import cz.b2brental.auth.JwtService
+import cz.b2brental.auth.LoginRateLimiter
+import cz.b2brental.auth.RevocationStore
 import cz.b2brental.config.Config
 import cz.b2brental.db.DatabaseFactory
 import cz.b2brental.db.seed
@@ -34,10 +36,13 @@ import cz.b2brental.services.llm.DisabledLlmClient
 import cz.b2brental.services.llm.LlmClient
 import cz.b2brental.services.llm.OpenAiCompatibleLlmClient
 import cz.b2brental.utils.ApiException
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.ApplicationStopping
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.jwt.JWTPrincipal
@@ -48,17 +53,23 @@ import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.ContentTransformationException
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.defaultheaders.DefaultHeaders
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.slf4j.LoggerFactory
 import java.time.Clock
 
 /** Logger neošetřených chyb; detail jde jen do logu, nikdy do těla odpovědi. */
 private val errorLogger = LoggerFactory.getLogger("cz.b2brental.status")
+
+/** SQLState porušení unikátního indexu (PostgreSQL i H2) */
+private const val UNIQUE_VIOLATION_SQL_STATE: String = "23505"
 
 /** Vstupní bod backendové aplikace */
 public fun main() {
@@ -73,12 +84,14 @@ public fun main() {
  */
 public fun Application.module(config: Config = Config.fromEnv()) {
     DatabaseFactory.connect(config.dbUrl, config.dbUser, config.dbPass)
-    seed()
+    if (config.seedDemoData) seed()
     val knowledgeIndexService = KnowledgeIndexService()
     knowledgeIndexService.synchronize()
 
     val jwtService = JwtService(config.jwtSecret)
-    val authService = AuthService(jwtService)
+    val loginRateLimiter = LoginRateLimiter()
+    val revocationStore = RevocationStore()
+    val authService = AuthService(jwtService, loginRateLimiter)
     val llmClient: LlmClient =
         if (config.aiEnabled) {
             OpenAiCompatibleLlmClient(config)
@@ -100,14 +113,42 @@ public fun Application.module(config: Config = Config.fromEnv()) {
     val pdfService = PdfService()
     val dashboardService = DashboardService(paymentService, Clock.systemDefaultZone())
 
+    install(DefaultHeaders) {
+        header("X-Content-Type-Options", "nosniff")
+        header("X-Frame-Options", "DENY")
+        header(HttpHeaders.CacheControl, "no-store")
+    }
+
     install(ContentNegotiation) {
         json(
             Json {
                 prettyPrint = false
-                isLenient = true
+                isLenient = false
                 ignoreUnknownKeys = true
             },
         )
+    }
+
+    // Omezení velikosti těla požadavku: odmítá se příliš velký Content-Length i přenos chunked,
+    // u kterého Content-Length chybí (limit 8 388 608 bajtů).
+    intercept(ApplicationCallPipeline.Plugins) {
+        val contentLength: Long = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: 0L
+        val chunked: Boolean =
+            call.request.headers[HttpHeaders.TransferEncoding]
+                ?.split(',')
+                ?.any { value -> value.trim().equals("chunked", ignoreCase = true) } == true
+        if (chunked || contentLength > 8_388_608L) {
+            call.respond(
+                HttpStatusCode.PayloadTooLarge,
+                ErrorBody(
+                    ErrorDetails(
+                        code = "PAYLOAD_TOO_LARGE",
+                        message = "Tělo požadavku je příliš velké (max. 8 MB)",
+                    ),
+                ),
+            )
+            finish()
+        }
     }
 
     install(StatusPages) {
@@ -124,36 +165,30 @@ public fun Application.module(config: Config = Config.fromEnv()) {
             )
         }
 
-        // 2) Chyby deserializace těla požadavku — Ktor 3.x je zabaluje dvakrát:
-        //    RequestConverter → BadRequestException("Failed to convert request body to …"),
-        //    konvertér kotlinx-json → JsonConvertException("Illegal input: …");
-        //    smysluplná česká zpráva (init{} value tříd Email/Ico) je proto v cause.cause.cause.
+        // 2) Chyby deserializace těla požadavku (Ktor 3.x) — odpověď nikdy neobsahuje fragment vstupu.
+        //    Zachovává se pouze smysluplná zpráva vlastních value tříd Email/Ico.
         exception<BadRequestException> { call, cause ->
+            val nested: Throwable? = cause.cause?.cause ?: cause.cause
+            val message: String =
+                if (nested is IllegalArgumentException && nested !is SerializationException) {
+                    nested.message ?: "Neplatná vstupní data"
+                } else {
+                    "Neplatná vstupní data"
+                }
             call.respond(
                 HttpStatusCode.BadRequest,
-                ErrorBody(
-                    ErrorDetails(
-                        code = "VALIDATION_ERROR",
-                        message =
-                            (
-                                cause.cause?.cause?.message
-                                    ?: cause.cause?.message
-                                    ?: cause.message
-                                    ?: "Neplatná vstupní data"
-                            ).take(250),
-                    ),
-                ),
+                ErrorBody(ErrorDetails(code = "VALIDATION_ERROR", message = message.take(250))),
             )
         }
 
         // 3) Tělo požadavku nelze transformovat (prázdné tělo, nepodporovaný Content-Type) → 400.
-        exception<ContentTransformationException> { call, cause ->
+        exception<ContentTransformationException> { call, _ ->
             call.respond(
                 HttpStatusCode.BadRequest,
                 ErrorBody(
                     ErrorDetails(
                         code = "VALIDATION_ERROR",
-                        message = (cause.message ?: "Neplatná vstupní data").take(250),
+                        message = "Neplatná vstupní data",
                     ),
                 ),
             )
@@ -187,6 +222,27 @@ public fun Application.module(config: Config = Config.fromEnv()) {
             )
         }
 
+        // 4a) Porušení unikátního indexu při souběhu zápisů → 409 místo 500.
+        exception<ExposedSQLException> { call, cause ->
+            if (cause.sqlState == UNIQUE_VIOLATION_SQL_STATE) {
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorBody(
+                        ErrorDetails(
+                            code = "CONFLICT",
+                            message = "Záznam již existuje",
+                        ),
+                    ),
+                )
+            } else {
+                errorLogger.error("Neošetřená chyba na ${call.request.uri}", cause)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ErrorBody(ErrorDetails(code = "INTERNAL_ERROR", message = "Vnitřní chyba serveru")),
+                )
+            }
+        }
+
         // 5) Vše ostatní → 500; detail výjimky jen do logu, tělo odpovědi je konstantní.
         exception<Throwable> { call, cause ->
             errorLogger.error("Neošetřená chyba na ${call.request.uri}", cause)
@@ -205,6 +261,17 @@ public fun Application.module(config: Config = Config.fromEnv()) {
                 algorithm = Algorithm.HMAC256(config.jwtSecret),
             )
             validate { credential ->
+                // Odmítnutí zneplatněných tokenů (jti revocation)
+                val jti: String? = credential.payload.getClaim(JwtService.CLAIM_JWT_ID)?.asString()
+                if (jti != null && revocationStore.isRevoked(jti)) return@validate null
+                // Token bez platného scope (staré tokeny před deployem) je odmítnut → vynutí opětovné přihlášení
+                val scope: String? = credential.payload.getClaim(JwtService.CLAIM_SCOPE)?.asString()
+                if (scope != JwtService.SCOPE_PLATFORM && scope != JwtService.SCOPE_TENANT) return@validate null
+                // Subject musí být číslo; jinak token odmítnout (ochrana proti userId → 0L)
+                val subject: String? = credential.payload.subject
+                if (subject?.toLongOrNull() == null) return@validate null
+                // Token bez expirace je odmítnut; bez exp by nebylo možné jej spolehlivě odvolat
+                if (credential.expiresAt == null) return@validate null
                 JWTPrincipal(credential.payload)
             }
             challenge { _, _ ->
@@ -228,7 +295,7 @@ public fun Application.module(config: Config = Config.fromEnv()) {
         get("/health") {
             call.respond(mapOf("status" to "ok"))
         }
-        authRoutes(authService)
+        authRoutes(authService, revocationStore)
         catalogRoutes(catalogService)
         contractRoutes(contractService)
         paymentRoutes(paymentService)

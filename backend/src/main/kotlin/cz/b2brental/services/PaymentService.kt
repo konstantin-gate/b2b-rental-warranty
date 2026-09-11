@@ -2,6 +2,7 @@
 
 package cz.b2brental.services
 
+import cz.b2brental.auth.JwtService
 import cz.b2brental.db.DocumentType
 import cz.b2brental.db.Documents
 import cz.b2brental.db.PaymentStatus
@@ -28,7 +29,9 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 
-/** Služba pro správu a evidenci plateb */
+/** Služba pro správu a evidenci plateb.
+ * @property clock časový zdroj pro deterministické testy; ve výrobě systemDefaultZone().
+ */
 public class PaymentService(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
@@ -44,74 +47,78 @@ public class PaymentService(
         }
     }
 
-    /** Seznam plateb s volitelným filtrem podle smlouvy a rolí volajícího */
+    /** Seznam plateb s volitelným filtrem podle smlouvy a rolí volajícího.
+     * @param role role volajícího ("admin", "manager", "client")
+     * @param callerCompanyId id firmy volajícího; null pro platformové uživatele
+     * @param contractId volitelný filtr podle smlouvy
+     * @param callerScope scope tokenu volajícího – "platform" nebo "tenant"
+     */
     public fun list(
         role: String,
         callerCompanyId: Long?,
         contractId: ContractId?,
+        callerScope: String,
     ): List<PaymentResponse> {
         refreshOverdue()
         return transaction {
             val query = Payments.selectAll()
             when (role) {
                 "admin", "manager" -> {
-                    if (contractId != null) {
-                        query.where { Payments.contractId eq contractId.value }
+                    if (callerScope == JwtService.SCOPE_TENANT) {
+                        val compId: Long =
+                            callerCompanyId
+                                ?: throw ForbiddenException("Manažer nemá přiřazenou společnost")
+                        val companyContractIds: List<EntityID<Long>> = getCompanyContractIds(compId)
+                        if (applyCompanyContractFilter(query, companyContractIds, contractId)) {
+                            return@transaction emptyList()
+                        }
+                    } else {
+                        if (contractId != null) {
+                            query.where { Payments.contractId eq contractId.value }
+                        }
                     }
                 }
+
                 "client" -> {
                     val compId: Long =
                         callerCompanyId
                             ?: throw ForbiddenException("Klient nemá přiřazenou společnost")
-                    val companyContractIds: List<EntityID<Long>> =
-                        RentalContracts
-                            .selectAll()
-                            .where { RentalContracts.companyId eq compId }
-                            .map { it[RentalContracts.id] }
+                    val companyContractIds: List<EntityID<Long>> = getCompanyContractIds(compId)
 
-                    if (contractId != null) {
-                        val contractBelongsToCompany: Boolean =
-                            companyContractIds.any { it.value == contractId.value }
-                        if (!contractBelongsToCompany) {
-                            throw ForbiddenException("Nemáte přístup k platbám této smlouvy")
-                        }
-                        query.where { Payments.contractId eq contractId.value }
-                    } else if (companyContractIds.isNotEmpty()) {
-                        query.where { Payments.contractId inList companyContractIds }
+                    if (applyCompanyContractFilter(query, companyContractIds, contractId)) {
+                        return@transaction emptyList()
                     }
                 }
+
                 else -> throw ForbiddenException("Role nemá přístup k platbám")
             }
             query.map(::toResponse)
         }
     }
 
-    /** Označení platby jako zaplacené */
+    /** Označení platby jako zaplacené.
+     * @param id identifikátor platby
+     * @param role role volajícího ("admin", "manager", "client")
+     * @param callerCompanyId id firmy volajícího; null pro platformové uživatele
+     * @param callerScope scope tokenu volajícího – "platform" nebo "tenant"
+     */
     public fun pay(
         id: PaymentId,
         role: String,
         callerCompanyId: Long?,
+        callerScope: String,
     ): PaymentActionResponse =
         transaction {
-            val row =
-                Payments
-                    .selectAll()
-                    .where { Payments.id eq id.value }
-                    .singleOrNull()
-                    ?: throw NotFoundException("Platba nenalezena")
+            val row = getPayment(id)
 
-            if (role == "client") {
+            if (role == "client" || callerScope == JwtService.SCOPE_TENANT) {
                 val contractIdValue: Long = row[Payments.contractId].value
-                val contractOwnerCompanyId: Long? =
-                    RentalContracts
-                        .selectAll()
-                        .where { RentalContracts.id eq contractIdValue }
-                        .map { it[RentalContracts.companyId].value }
-                        .singleOrNull()
+                validateContractOwnership(contractIdValue, callerCompanyId)
+            }
 
-                if (contractOwnerCompanyId != callerCompanyId) {
-                    throw ForbiddenException("Nemáte oprávnění platit tuto platbu")
-                }
+            // Klient smí označit platbu jako zaplacenou nejdříve v den splatnosti
+            if (role == "client" && row[Payments.dueDate] > LocalDate.now(clock)) {
+                throw ConflictException("Platbu lze označit jako zaplacenou nejdříve v den splatnosti")
             }
 
             if (row[Payments.status] == PaymentStatus.paid) {
@@ -127,7 +134,76 @@ public class PaymentService(
             PaymentActionResponse(id.value, PaymentStatus.paid, now)
         }
 
-    /** Mapování řádku DB na odpověď o platbě */
+    /** Najde platbu podle id; vyhodí NotFoundException, pokud neexistuje.
+     * @param id identifikátor platby
+     */
+    private fun getPayment(
+        id: PaymentId,
+    ): ResultRow =
+        Payments
+            .selectAll()
+            .where { Payments.id eq id.value }
+            .singleOrNull()
+            ?: throw NotFoundException("Platba nenalezena")
+
+    /** Získá seznam id smluv přiřazených k firmě.
+     * @param compId identifikátor firmy
+     */
+    private fun getCompanyContractIds(
+        compId: Long,
+    ): List<EntityID<Long>> =
+        RentalContracts
+            .selectAll()
+            .where { RentalContracts.companyId eq compId }
+            .map { it[RentalContracts.id] }
+
+    /** Aplikuje filtr podle smluv firmy do dotazu; vrací true, pokud má metoda vrátit prázdný seznam.
+     * @param query dotaz na platby
+     * @param companyContractIds seznam id smluv firmy
+     * @param contractId volitelný filtr podle konkrétní smlouvy
+     */
+    private fun applyCompanyContractFilter(
+        query: org.jetbrains.exposed.sql.Query,
+        companyContractIds: List<EntityID<Long>>,
+        contractId: ContractId?,
+    ): Boolean {
+        if (contractId != null) {
+            val contractBelongsToCompany: Boolean = companyContractIds.any { it.value == contractId.value }
+            if (!contractBelongsToCompany) {
+                throw NotFoundException("Smlouva nenalezena")
+            }
+            query.where { Payments.contractId eq contractId.value }
+        } else {
+            if (companyContractIds.isEmpty()) {
+                return true
+            }
+            query.where { Payments.contractId inList companyContractIds }
+        }
+        return false
+    }
+
+    /** Získá id firmy vlastníka smlouvy; vyhodí NotFoundException, pokud smlouva nepatří firmě volajícího.
+     * @param contractIdValue identifikátor smlouvy
+     * @param callerCompanyId id firmy volajícího
+     */
+    private fun validateContractOwnership(
+        contractIdValue: Long,
+        callerCompanyId: Long?,
+    ) {
+        val contractOwnerCompanyId: Long? =
+            RentalContracts
+                .selectAll()
+                .where { RentalContracts.id eq contractIdValue }
+                .map { it[RentalContracts.companyId].value }
+                .singleOrNull()
+        if (contractOwnerCompanyId != callerCompanyId) {
+            throw NotFoundException("Platba nenalezena")
+        }
+    }
+
+    /** Mapování řádku DB na odpověď o platbě.
+     * @param row řádek výsledku dotazu z tabulky Payments
+     */
     private fun toResponse(row: ResultRow): PaymentResponse =
         PaymentResponse(
             id = row[Payments.id].value,
@@ -142,32 +218,25 @@ public class PaymentService(
     /**
      * Idempotentní získání nebo vytvoření záznamu PDF faktury k platbě.
      * Klient smí pouze faktury plateb své společnosti.
+     * @param id identifikátor platby
+     * @param role role volajícího ("admin", "manager", "client")
+     * @param callerCompanyId id firmy volajícího; null pro platformové uživatele
+     * @param callerUserId identifikátor uživatele, autor záznamu dokumentu
+     * @param callerScope scope tokenu volajícího – "platform" nebo "tenant"
      */
     public fun pdfDocument(
         id: PaymentId,
         role: String,
         callerCompanyId: Long?,
         callerUserId: Long,
+        callerScope: String,
     ): DocumentPdfResponse =
         transaction {
-            val payment =
-                Payments
-                    .selectAll()
-                    .where { Payments.id eq id.value }
-                    .singleOrNull() ?: throw NotFoundException("Platba nenalezena")
+            val payment = getPayment(id)
 
-            if (role == "client") {
+            if (role == "client" || callerScope == JwtService.SCOPE_TENANT) {
                 val contractIdValue: Long = payment[Payments.contractId].value
-                val contractOwnerCompanyId: Long? =
-                    RentalContracts
-                        .selectAll()
-                        .where { RentalContracts.id eq contractIdValue }
-                        .map { it[RentalContracts.companyId].value }
-                        .singleOrNull()
-
-                if (contractOwnerCompanyId != callerCompanyId) {
-                    throw ForbiddenException("Nemáte oprávnění k faktuře této platby")
-                }
+                validateContractOwnership(contractIdValue, callerCompanyId)
             }
 
             val existing =

@@ -23,7 +23,7 @@ import org.jetbrains.exposed.sql.update
  */
 public class NotificationService {
     /**
-     * Vytvoří notifikace pro všechny uživatele rolí manager a admin.
+     * Notifikuje pouze platformové manažery a administrátory (uživatelé bez firmy).
      * Musí být voláno uvnitř externí transakce (nevytváří vlastní transaction {}).
      * @param message text notifikace
      */
@@ -32,8 +32,9 @@ public class NotificationService {
         val managers: List<EntityID<Long>> =
             Users
                 .selectAll()
-                .where { Users.role inList listOf("manager", "admin") }
-                .map { row -> row[Users.id] }
+                .where {
+                    (Users.role inList listOf("manager", "admin")) and Users.companyId.isNull()
+                }.map { row -> row[Users.id] }
         for (manager in managers) {
             Notifications.insert {
                 it[userId] = manager
@@ -125,7 +126,7 @@ public class NotificationService {
         }
 
     /**
-     * Označí notifikaci jako přečтенou. Cizí nebo neexistující notifikace → NotFoundException.
+     * Označí notifikaci jako přečtenou. Cizí nebo neexistující notifikace → NotFoundException.
      * @param userId identifikátor uživatele (vlastník notifikace)
      * @param notificationId identifikátor notifikace
      * @return aktualizovaná notifikace

@@ -15,7 +15,10 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
-/** Registrace tras pro seznam uživatelů (pro přiřazení techniků) */
+/**
+ * Seznam techniků pro přiřazení k tiketům; přístupné manažerům a administrátorům platformy i firmy.
+ * PII (e-mail, telefon) je vždy maskováno.
+ */
 public fun Route.userRoutes() {
     route("/users") {
         authenticate("auth-jwt") {
@@ -34,10 +37,20 @@ public fun Route.userRoutes() {
                             .where { Users.role eq "technician" }
                             .orderBy(Users.email to SortOrder.ASC)
                             .map { row ->
+                                val email: String = row[Users.email]
+                                val maskedEmail: String =
+                                    if (email.contains("@")) {
+                                        val domain = email.substringAfter("@")
+                                        email.take(2) + "***@$domain"
+                                    } else {
+                                        "***"
+                                    }
+                                val phone: String? = row[Users.phone]
+                                val maskedPhone: String? = if (phone != null) "***" else null
                                 TechnicianResponse(
                                     id = row[Users.id].value,
-                                    email = row[Users.email],
-                                    phone = row[Users.phone],
+                                    email = maskedEmail,
+                                    phone = maskedPhone,
                                 )
                             }
                     }

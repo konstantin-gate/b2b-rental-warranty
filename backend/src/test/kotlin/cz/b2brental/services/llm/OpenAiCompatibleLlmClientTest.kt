@@ -30,26 +30,26 @@ private class MockResults(
     val requests: MutableList<HttpRequestData> = mutableListOf()
 }
 
-/** Vytvoří klienta LLM na MockEngine s frontou odpovědí */
-private fun makeClient(
-    config: Config,
-    results: MockResults,
-): OpenAiCompatibleLlmClient {
-    val handler: MockRequestHandler = { request ->
-        results.requests.add(request)
-        val (status, body) =
-            if (results.responses.size > 1) results.responses.removeAt(0) else results.responses[0]
-        respond(
-            content = ByteReadChannel(body),
-            status = status,
-            headers = headersOf(HttpHeaders.ContentType, "application/json"),
-        )
-    }
-    return OpenAiCompatibleLlmClient(config, engine = MockEngine(handler))
-}
-
 /** Testy OpenAiCompatibleLlmClient na MockEngine */
 class OpenAiCompatibleLlmClientTest {
+    /** Vytvoří klienta LLM na MockEngine s frontou odpovědí */
+    private fun makeClient(
+        config: Config,
+        results: MockResults,
+    ): OpenAiCompatibleLlmClient {
+        val handler: MockRequestHandler = { request ->
+            results.requests.add(request)
+            val (status, body) =
+                if (results.responses.size > 1) results.responses.removeAt(0) else results.responses[0]
+            respond(
+                content = ByteReadChannel(body),
+                status = status,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        return OpenAiCompatibleLlmClient(config, engine = MockEngine(handler))
+    }
+
     private fun config(
         aiApiKey: String?,
         aiMaxRetries: Int = 0,
@@ -67,6 +67,7 @@ class OpenAiCompatibleLlmClientTest {
             aiMaxRetries = aiMaxRetries,
             aiMaxOutputTokens = 700,
             aiEnabled = true,
+            seedDemoData = false,
         )
 
     private fun jsonQuote(text: String): String = "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
@@ -102,7 +103,7 @@ class OpenAiCompatibleLlmClientTest {
     @Test
     fun thinkBlocksRemovedTest(): Unit =
         runBlocking {
-            val body: String = "<think>úvaha</think>čistý text"
+            val body = "<think>úvaha</think>čistý text"
             val results = MockResults(mutableListOf(HttpStatusCode.OK to okBody(body)))
             val client = makeClient(config(aiApiKey = null), results)
             val result = client.complete(LlmCompletionRequest(listOf(LlmMessage("user", "ahoj"))))

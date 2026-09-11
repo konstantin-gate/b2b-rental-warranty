@@ -145,28 +145,28 @@ public fun seed() {
             Users.insert {
                 it[role] = "admin"
                 it[email] = "admin@b2b.demo"
-                it[passwordHash] = BCrypt.hashpw("admin123", BCrypt.gensalt())
+                it[passwordHash] = BCrypt.hashpw("admin1234abcd", BCrypt.gensalt())
             } get Users.id
 
         val managerId =
             Users.insert {
                 it[role] = "manager"
                 it[email] = "manager@b2b.demo"
-                it[passwordHash] = BCrypt.hashpw("manager123", BCrypt.gensalt())
+                it[passwordHash] = BCrypt.hashpw("manager1234abcd", BCrypt.gensalt())
             } get Users.id
 
         val techId =
             Users.insert {
                 it[role] = "technician"
                 it[email] = "tech@b2b.demo"
-                it[passwordHash] = BCrypt.hashpw("tech123", BCrypt.gensalt())
+                it[passwordHash] = BCrypt.hashpw("tech12345abcd", BCrypt.gensalt())
             } get Users.id
 
         val clientUserId =
             Users.insert {
                 it[role] = "client"
                 it[email] = "kitchen@b2b.demo"
-                it[passwordHash] = BCrypt.hashpw("kitchen123", BCrypt.gensalt())
+                it[passwordHash] = BCrypt.hashpw("kitchen1234abcd", BCrypt.gensalt())
                 it[Users.companyId] = companyId
             } get Users.id
 

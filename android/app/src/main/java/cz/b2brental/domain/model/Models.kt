@@ -1,7 +1,7 @@
 package cz.b2brental.domain.model
 
 /**
- * Profil přihlášeného uživatele uložený v DataStore.
+ * Profil přihlášeného uživatele uložený v šifrovaném úložišti (Android Keystore, AES-256-GCM).
  * Slouží k určení role a identifikaci uživatele napříč obrazovkami.
  * @property token JWT token pro autorizaci API požadavků
  * @property userId ID přihlášeného uživatele v databázi

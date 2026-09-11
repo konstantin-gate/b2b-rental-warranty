@@ -1,8 +1,11 @@
 package cz.b2brental.data.repository
 
 import cz.b2brental.data.local.TokenStorage
+import cz.b2brental.data.remote.ApiException
 import cz.b2brental.data.remote.B2bApiClient
 import cz.b2brental.data.remote.B2bJson
+import cz.b2brental.data.remote.OfflineException
+import cz.b2brental.data.remote.SessionClearer
 import cz.b2brental.data.remote.dto.RegisterCompanyRequestDto
 import cz.b2brental.domain.model.UserProfile
 import cz.b2brental.domain.model.UserRole
@@ -10,17 +13,19 @@ import cz.b2brental.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Implementace AuthRepository — spravuje přihlášení, registraci a session přes DataStore.
+ * Implementace AuthRepository — spravuje přihlášení, registraci a session přes šifrované úložiště (Android Keystore).
  * @param apiClient HTTP klient pro komunikaci s backend API
  * @param tokenStorage úložiště JWT tokenu a profilu uživatele
+ * @param sessionClearer správce mazání session a offline cache
  */
 public class AuthRepositoryImpl(
     private val apiClient: B2bApiClient,
     private val tokenStorage: TokenStorage,
+    private val sessionClearer: SessionClearer,
 ) : AuthRepository {
 
     /**
-     * Přihlášení uživatele — zavolá API a uloží session do DataStore.
+     * Přihlášení uživatele — zavolá API a uloží session do šifrovaného úložiště.
      * @param email přihlašovací e-mail
      * @param password heslo
      */
@@ -68,10 +73,18 @@ public class AuthRepositoryImpl(
     }
 
     /**
-     * Odhlášení uživatele — vymaže session z DataStore.
+     * Odhlášení uživatele — zneplatní token na serveru a vymaže session i offline cache Room.
+     * Při nedostupnosti serveru se lokální session vymaže vždy.
      */
     override suspend fun logout(): Unit {
-        tokenStorage.clear()
+        try {
+            apiClient.logout()
+        } catch (_: OfflineException) {
+            // Server není dostupný — lokální session se vymaže i tak
+        } catch (_: ApiException) {
+            // Server token již zneplatnil; lokální session se vymaže i tak
+        }
+        sessionClearer.clearSession()
     }
 
     /**

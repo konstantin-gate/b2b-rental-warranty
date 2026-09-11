@@ -28,9 +28,9 @@ class ContractFlowTest {
     @Test
     fun contractApproveRejectFlow(): Unit =
         withB2bTestApp("contract-flow") {
-            val clientToken = login("kitchen@b2b.demo", "kitchen123")
-            val managerToken = login("manager@b2b.demo", "manager123")
-            val techToken = login("tech@b2b.demo", "tech123")
+            val clientToken = login("kitchen@b2b.demo", "kitchen1234abcd")
+            val managerToken = login("manager@b2b.demo", "manager1234abcd")
+            val techToken = login("tech@b2b.demo", "tech12345abcd")
 
             val createResp =
                 client.post("/contracts") {

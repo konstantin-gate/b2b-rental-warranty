@@ -5,15 +5,14 @@ services:
       POSTGRES_DB: ${DB_NAME:?err}
       POSTGRES_USER: ${DB_USER:?err}
       POSTGRES_PASSWORD: ${DB_PASS:?err}
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 10
+    mem_limit: 512m
 
   backend:
     build: ./backend
@@ -27,13 +26,16 @@ services:
       JWT_SECRET: ${JWT_SECRET:?err}
       # AI je v docker rezimu vypnuto (llama-server se v compose nespousti)
       AI_ENABLED: "false"
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:?err}
     ports:
       - "8090:8090"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8090/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8090/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
+    mem_limit: 768m
+    security_opt: [ "no-new-privileges:true" ]
 
 volumes:
   pgdata:

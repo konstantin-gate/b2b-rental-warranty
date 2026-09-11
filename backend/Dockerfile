@@ -11,5 +11,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/build/install/backend/ ./backend
+RUN useradd -r -u 1001 appuser
+USER appuser
 EXPOSE 8090
 CMD ["./backend/bin/backend"]

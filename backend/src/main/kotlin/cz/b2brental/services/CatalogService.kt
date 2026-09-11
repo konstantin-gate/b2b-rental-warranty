@@ -24,12 +24,17 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
 /** Služba pro správu katalogu vybavení */
 public class CatalogService {
-    /** Vrátí seznam položek s volitelným filtrem podle kategorie a stavu */
+    /**
+     * Vrátí seznam položek s volitelným filtrem podle kategorie a stavu.
+     * @param categoryId volitelný filtr podle id kategorie vybavení
+     * @param status volitelný filtr podle stavu vybavení
+     */
     public fun list(
         categoryId: EquipmentCategoryId?,
         status: String?,
@@ -57,7 +62,10 @@ public class CatalogService {
         }
     }
 
-    /** Vrátí detail konkrétního vybavení podle ID */
+    /**
+     * Vrátí detail konkrétního vybavení podle ID.
+     * @param id identifikátor vybavení
+     */
     public fun get(id: EquipmentId): CatalogItemResponse =
         transaction {
             Equipment
@@ -68,7 +76,10 @@ public class CatalogService {
                 ?: throw NotFoundException("Vybavení nenalezeno")
         }
 
-    /** Vytvoří novou položku v katalogu se stavem available */
+    /**
+     * Vytvoří novou položku v katalogu se stavem available.
+     * @param req požadavek s daty nového vybavení
+     */
     public fun create(req: CatalogUpsertRequest): Long {
         validateMoney(req.price, req.monthlyRate)
         return transaction {
@@ -79,19 +90,17 @@ public class CatalogService {
 
             Equipment
                 .insertAndGetId {
-                    it[Equipment.categoryId] = EntityID(req.categoryId.value, EquipmentCategories)
-                    it[Equipment.model] = req.model
-                    it[Equipment.serialNumber] = req.serialNumber
-                    it[Equipment.price] = req.price.toDbBigDecimal()
-                    it[Equipment.monthlyRate] = req.monthlyRate.toDbBigDecimal()
-                    it[Equipment.description] = req.description
-                    it[Equipment.photoUrl] = req.photoUrl
+                    fillEquipmentFields(it, req)
                     it[Equipment.status] = EquipmentStatus.available
                 }.value
         }
     }
 
-    /** Aktualizuje existující položku v katalogu */
+    /**
+     * Aktualizuje existující položku v katalogu. Upravovat lze pouze položku ve stavu available.
+     * @param id identifikátor upravovaného vybavení
+     * @param req požadavek s aktualizovanými daty vybavení
+     */
     public fun update(
         id: EquipmentId,
         req: CatalogUpsertRequest,
@@ -105,6 +114,11 @@ public class CatalogService {
                     .singleOrNull()
                     ?: throw NotFoundException("Vybavení nenalezeno")
 
+            // Upravovat lze pouze dostupné vybavení (pronajaté/údržba → 409)
+            if (existing[Equipment.status] != EquipmentStatus.available) {
+                throw ConflictException("Upravovat lze pouze dostupné vybavení")
+            }
+
             requireCategoryExists(req.categoryId.value)
 
             val currentSerial: String = existing[Equipment.serialNumber]
@@ -113,18 +127,15 @@ public class CatalogService {
             }
 
             Equipment.update({ Equipment.id eq id.value }) {
-                it[Equipment.categoryId] = EntityID(req.categoryId.value, EquipmentCategories)
-                it[Equipment.model] = req.model
-                it[Equipment.serialNumber] = req.serialNumber
-                it[Equipment.price] = req.price.toDbBigDecimal()
-                it[Equipment.monthlyRate] = req.monthlyRate.toDbBigDecimal()
-                it[Equipment.description] = req.description
-                it[Equipment.photoUrl] = req.photoUrl
+                fillEquipmentFields(it, req)
             }
         }
     }
 
-    /** Smaže položku, pokud není svázána se smlouvou ani servisním tiketem */
+    /**
+     * Smaže položku, pokud není svázána se smlouvou ani servisním tiketem.
+     * @param id identifikátor odstraňovaného vybavení
+     */
     public fun delete(id: EquipmentId) {
         transaction {
             val exists =
@@ -158,7 +169,11 @@ public class CatalogService {
         }
     }
 
-    /** Cena a měsíční sazba nesmí být záporné */
+    /**
+     * Cena a měsíční sazba nesmí být záporné.
+     * @param price prodejní cena
+     * @param monthlyRate měsíční sazba nájmu
+     */
     private fun validateMoney(
         price: Money,
         monthlyRate: Money,
@@ -168,7 +183,10 @@ public class CatalogService {
         }
     }
 
-    /** Kategorie musí existovat */
+    /**
+     * Kategorie musí existovat.
+     * @param categoryIdValue hodnota identifikátoru kategorie
+     */
     private fun requireCategoryExists(categoryIdValue: Long) {
         val exists =
             EquipmentCategories
@@ -180,14 +198,20 @@ public class CatalogService {
         }
     }
 
-    /** Kontrola duplicitního sériového čísla */
+    /**
+     * Kontrola duplicitního sériového čísla.
+     * @param serialNumber kontrolované sériové číslo
+     */
     private fun equipmentSerialExists(serialNumber: String): Boolean =
         Equipment
             .selectAll()
             .where { Equipment.serialNumber eq serialNumber }
             .count() > 0L
 
-    /** Mapování řádku DB na odpověď katalogu */
+    /**
+     * Mapování řádku DB na odpověď katalogu.
+     * @param row řádek výsledku dotazu na vybavení
+     */
     private fun toResponse(row: ResultRow): CatalogItemResponse {
         val catId: Long = row[Equipment.categoryId].value
         val categoryName: String =
@@ -209,5 +233,23 @@ public class CatalogService {
             photoUrl = row[Equipment.photoUrl],
             status = row[Equipment.status],
         )
+    }
+
+    /**
+     * Vyplnění společných polí vybavení pro vložení i aktualizaci.
+     * @param builder builder aktualizace nebo vložení záznamu
+     * @param req požadavek s daty vybavení
+     */
+    private fun fillEquipmentFields(
+        builder: UpdateBuilder<*>,
+        req: CatalogUpsertRequest,
+    ) {
+        builder[Equipment.categoryId] = EntityID(req.categoryId.value, EquipmentCategories)
+        builder[Equipment.model] = req.model
+        builder[Equipment.serialNumber] = req.serialNumber
+        builder[Equipment.price] = req.price.toDbBigDecimal()
+        builder[Equipment.monthlyRate] = req.monthlyRate.toDbBigDecimal()
+        builder[Equipment.description] = req.description
+        builder[Equipment.photoUrl] = req.photoUrl
     }
 }

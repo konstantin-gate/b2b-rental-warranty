@@ -12,7 +12,6 @@ import java.time.LocalDate
  * Společná pro vytvoření tiketu i kontrolu záruky přes AI.
  * @property contractStartDate počáteční datum aktivní smlouvy nebo null
  * @property warrantyMonths délka záruky v měsících podle pravidla nebo null, pokud pravidlo neexistuje
- * @property excludedCauses seznam vyloučených příčin rozparsovaný z pravidla
  * @property hasRule příznak existence záručního pravidla pro kategorii
  * @property equipmentModel model vybavení
  * @property categoryName název kategorie vybavení
@@ -20,7 +19,6 @@ import java.time.LocalDate
 internal data class WarrantyPrelude(
     val contractStartDate: LocalDate?,
     val warrantyMonths: Int?,
-    val excludedCauses: List<String>,
     val hasRule: Boolean,
     val equipmentModel: String,
     val categoryName: String,
@@ -53,21 +51,14 @@ internal fun buildWarrantyPrelude(
         return WarrantyPrelude(
             contractStartDate = contractStartDate,
             warrantyMonths = null,
-            excludedCauses = emptyList(),
             hasRule = false,
             equipmentModel = equipmentModel,
             categoryName = categoryName,
         )
     }
-    val excludedCauses: List<String> =
-        rule[WarrantyRules.excludedCauses]
-            .split(',')
-            .map { cause -> cause.trim() }
-            .filter { cause -> cause.isNotEmpty() }
     return WarrantyPrelude(
         contractStartDate = contractStartDate,
         warrantyMonths = rule[WarrantyRules.warrantyMonths],
-        excludedCauses = excludedCauses,
         hasRule = true,
         equipmentModel = equipmentModel,
         categoryName = categoryName,

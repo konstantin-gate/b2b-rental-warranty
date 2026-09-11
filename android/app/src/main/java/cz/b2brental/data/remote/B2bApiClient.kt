@@ -6,6 +6,7 @@ import cz.b2brental.data.local.TokenStorage
 import cz.b2brental.data.remote.dto.*
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
 import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
@@ -60,6 +61,18 @@ public class B2bApiClient(
             client.post("/auth/register-company") {
                 setBody(req)
             }.body()
+        }
+    }
+
+    /**
+     * Odhlášení uživatele (POST /auth/logout) — zneplatní JWT token na serveru.
+     */
+    public suspend fun logout(): Unit {
+        safeApiCall(sessionClearer) {
+            client.post("/auth/logout") {
+                authHeader()
+                timeout { requestTimeoutMillis = 5_000 }
+            }
         }
     }
 

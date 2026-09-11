@@ -18,14 +18,14 @@ class CatalogFlowTest {
             val unauthResp = client.get("/catalog")
             assertEquals(HttpStatusCode.Unauthorized, unauthResp.status)
 
-            val clientToken = login("kitchen@b2b.demo", "kitchen123")
+            val clientToken = login("kitchen@b2b.demo", "kitchen1234abcd")
             val catalogResp =
                 client.get("/catalog") {
                     header(HttpHeaders.Authorization, "Bearer $clientToken")
                 }
             assertEquals(HttpStatusCode.OK, catalogResp.status)
 
-            val techToken = login("tech@b2b.demo", "tech123")
+            val techToken = login("tech@b2b.demo", "tech12345abcd")
             val techCatalog =
                 client.get("/catalog") {
                     header(HttpHeaders.Authorization, "Bearer $techToken")

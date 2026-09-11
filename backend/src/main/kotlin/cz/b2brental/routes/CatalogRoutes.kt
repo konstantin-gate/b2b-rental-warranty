@@ -7,7 +7,7 @@ import cz.b2brental.domain.EquipmentId
 import cz.b2brental.models.CatalogUpsertRequest
 import cz.b2brental.services.CatalogService
 import cz.b2brental.utils.BadRequestException
-import cz.b2brental.utils.requireRole
+import cz.b2brental.utils.requirePlatform
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -19,7 +19,10 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
-/** Registrace tras pro katalog vybavení */
+/**
+ * Registrace tras pro katalog vybavení.
+ * @param service servis katalogu (CRUD operace nad vybavením)
+ */
 public fun Route.catalogRoutes(service: CatalogService) {
     route("/catalog") {
         authenticate("auth-jwt") {
@@ -44,16 +47,16 @@ public fun Route.catalogRoutes(service: CatalogService) {
                 call.respond(service.get(id))
             }
 
-            // Změny pouze pro role admin a manager
+            // Změny pouze pro role admin a manager (platform scope)
             post {
-                call.requireRole("admin", "manager")
+                call.requirePlatform("admin", "manager")
                 val req = call.receive<CatalogUpsertRequest>()
                 val id = service.create(req)
                 call.respond(HttpStatusCode.Created, mapOf("id" to id))
             }
 
             put("/{id}") {
-                call.requireRole("admin", "manager")
+                call.requirePlatform("admin", "manager")
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::EquipmentId)
                         ?: throw BadRequestException("Neplatné id vybavení")
@@ -63,7 +66,7 @@ public fun Route.catalogRoutes(service: CatalogService) {
             }
 
             delete("/{id}") {
-                call.requireRole("admin", "manager")
+                call.requirePlatform("admin", "manager")
                 val id =
                     call.parameters["id"]?.toLongOrNull()?.let(::EquipmentId)
                         ?: throw BadRequestException("Neplatné id vybavení")

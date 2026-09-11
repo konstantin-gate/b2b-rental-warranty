@@ -1,7 +1,7 @@
 package cz.b2brental.di
 
 import cz.b2brental.data.local.B2bDatabase
-import cz.b2brental.data.local.DataStoreTokenStorage
+import cz.b2brental.data.local.SecureTokenStorage
 import cz.b2brental.data.local.TokenStorage
 import cz.b2brental.data.remote.B2bApiClient
 import cz.b2brental.data.remote.SessionClearer
@@ -57,8 +57,8 @@ import org.koin.dsl.module
  */
 public val networkModule: Module = module {
     single { createB2bHttpClient() }
-    single<TokenStorage> { DataStoreTokenStorage(androidContext()) }
-    single<SessionClearer> { SessionClearerImpl(get()) }
+    single<TokenStorage> { SecureTokenStorage(androidContext()) }
+    single<SessionClearer> { SessionClearerImpl(get(), get()) }
     single { B2bApiClient(get(), get(), get()) }
     single { B2bDatabase.create(androidContext()) }
     single { get<B2bDatabase>().catalogDao() }
@@ -69,7 +69,7 @@ public val networkModule: Module = module {
  * Modul repozitářů — spravuje přístup k datům (auth session).
  */
 public val repositoryModule: Module = module {
-    single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
+    single<AuthRepository> { AuthRepositoryImpl(get(), get(), get()) }
     single<CatalogRepository> { CatalogRepositoryImpl(get(), get()) }
     single<ContractRepository> { ContractRepositoryImpl(get()) }
     single<TicketRepository> { TicketRepositoryImpl(get()) }

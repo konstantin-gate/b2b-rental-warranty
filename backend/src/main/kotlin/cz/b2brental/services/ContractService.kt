@@ -2,6 +2,7 @@
 
 package cz.b2brental.services
 
+import cz.b2brental.auth.JwtService
 import cz.b2brental.db.Companies
 import cz.b2brental.db.ContractItems
 import cz.b2brental.db.ContractStatus
@@ -57,6 +58,9 @@ public class ContractService(
         if (req.startDate.isBefore(LocalDate.now())) {
             throw BadRequestException("Datum zahájení nesmí být v minulosti")
         }
+        if (req.deliveryAddress.length > 300) {
+            throw BadRequestException("Dodací adresa musí mít max. 300 znaků")
+        }
 
         val uniqueEquipmentIds: Set<Long> = req.equipmentIds.map { it.value }.toSet()
         if (uniqueEquipmentIds.size != req.equipmentIds.size) {
@@ -108,22 +112,33 @@ public class ContractService(
     /**
      * Seznam smluv dle role volajícího
      * @param role role volajícího uživatele
-     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     * @param callerCompanyId id společnosti volajícího; null pouze u platformového personálu
+     * @param callerScope scope volajícího (platform/tenant)
      */
     public fun list(
         role: String,
         callerCompanyId: Long?,
+        callerScope: String,
     ): List<ContractResponse> =
         transaction {
             val query = RentalContracts.selectAll()
             when (role) {
-                "admin", "manager" -> Unit
+                "admin", "manager" -> {
+                    if (callerScope == JwtService.SCOPE_TENANT) {
+                        val compId =
+                            callerCompanyId
+                                ?: throw ForbiddenException("Manažer nemá přiřazenou společnost")
+                        query.where { RentalContracts.companyId eq compId }
+                    }
+                }
+
                 "client" -> {
                     val compId =
                         callerCompanyId
                             ?: throw ForbiddenException("Klient nemá přiřazenou společnost")
                     query.where { RentalContracts.companyId eq compId }
                 }
+
                 else -> throw ForbiddenException("Role nemá přístup k nájemním smlouvám")
             }
             query.map(::toResponse)
@@ -133,17 +148,22 @@ public class ContractService(
      * Získání detailu smlouvy
      * @param id id smlouvy
      * @param role role volajícího uživatele
-     * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
+     * @param callerCompanyId id společnosti volajícího; null pouze u platformového personálu
+     * @param callerScope scope volajícího (platform/tenant)
      */
     public fun get(
         id: ContractId,
         role: String,
         callerCompanyId: Long?,
+        callerScope: String,
     ): ContractResponse =
         transaction {
             val contract: ContractResponse = getInternal(id.value)
             if (role == "client" && contract.companyId != callerCompanyId) {
-                throw ForbiddenException("Nemáte přístup k této smlouvě")
+                throw NotFoundException("Smlouva nenalezena")
+            }
+            if ((role == "manager" || role == "admin") && callerScope == JwtService.SCOPE_TENANT && contract.companyId != callerCompanyId) {
+                throw NotFoundException("Smlouva nenalezena")
             }
             if (role != "admin" && role != "manager" && role != "client") {
                 throw ForbiddenException("Nemáte přístup k této smlouvě")
@@ -234,13 +254,15 @@ public class ContractService(
      * @param role role volajícího uživatele
      * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
      * @param callerUserId id volajícího uživatele (autor dokumentu)
+     * @param callerScope scope volajícího (platform/tenant)
      */
     public fun pdfDocument(
         id: ContractId,
         role: String,
         callerCompanyId: Long?,
         callerUserId: Long,
-    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.rental_contract, role, callerCompanyId, callerUserId)
+        callerScope: String,
+    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.rental_contract, role, callerCompanyId, callerUserId, callerScope)
 
     /**
      * Získání nebo vytvoření předávacího protokolu (akceptačního aktu)
@@ -248,13 +270,15 @@ public class ContractService(
      * @param role role volajícího uživatele
      * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
      * @param callerUserId id volajícího uživatele (autor dokumentu)
+     * @param callerScope scope volajícího (platform/tenant)
      */
     public fun acceptanceActDocument(
         id: ContractId,
         role: String,
         callerCompanyId: Long?,
         callerUserId: Long,
-    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.acceptance_act, role, callerCompanyId, callerUserId)
+        callerScope: String,
+    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.acceptance_act, role, callerCompanyId, callerUserId, callerScope)
 
     /**
      * Získání nebo vytvoření protokolu o vrácení zařízení
@@ -262,13 +286,15 @@ public class ContractService(
      * @param role role volajícího uživatele
      * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
      * @param callerUserId id volajícího uživatele (autor dokumentu)
+     * @param callerScope scope volajícího (platform/tenant)
      */
     public fun returnActDocument(
         id: ContractId,
         role: String,
         callerCompanyId: Long?,
         callerUserId: Long,
-    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.return_act, role, callerCompanyId, callerUserId)
+        callerScope: String,
+    ): DocumentPdfResponse = createOrGetContractDoc(id, DocumentType.return_act, role, callerCompanyId, callerUserId, callerScope)
 
     /**
      * Idempotentní získání nebo vytvoření záznamu dokumentu smlouvy.
@@ -278,6 +304,7 @@ public class ContractService(
      * @param role role volajícího uživatele
      * @param callerCompanyId id společnosti volajícího klienta (null pro admin/manager)
      * @param callerUserId id volajícího uživatele (autor dokumentu)
+     * @param callerScope scope volajícího (platform/tenant)
      */
     private fun createOrGetContractDoc(
         id: ContractId,
@@ -285,6 +312,7 @@ public class ContractService(
         role: String,
         callerCompanyId: Long?,
         callerUserId: Long,
+        callerScope: String,
     ): DocumentPdfResponse =
         transaction {
             val row =
@@ -294,7 +322,13 @@ public class ContractService(
                     .singleOrNull() ?: throw NotFoundException("Smlouva nenalezena")
 
             if (role == "client" && row[RentalContracts.companyId].value != callerCompanyId) {
-                throw ForbiddenException("Nemáte přístup k této smlouvě")
+                throw NotFoundException("Smlouva nenalezena")
+            }
+            if ((role == "manager" || role == "admin") &&
+                callerScope == JwtService.SCOPE_TENANT &&
+                row[RentalContracts.companyId].value != callerCompanyId
+            ) {
+                throw NotFoundException("Smlouva nenalezena")
             }
 
             if (row[RentalContracts.status] != ContractStatus.active) {

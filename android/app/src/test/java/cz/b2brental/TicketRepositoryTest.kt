@@ -3,24 +3,17 @@
 package cz.b2brental
 
 import cz.b2brental.data.local.TokenStorage
-import cz.b2brental.data.remote.ApiException
-import cz.b2brental.data.remote.B2bApiClient
-import cz.b2brental.data.remote.OfflineException
-import cz.b2brental.data.remote.SessionClearer
-import cz.b2brental.data.remote.createB2bHttpClient
+import cz.b2brental.data.remote.*
 import cz.b2brental.data.remote.dto.TicketCreateRequestDto
 import cz.b2brental.data.repository.TicketRepositoryImpl
 import cz.b2brental.domain.model.Severity
 import cz.b2brental.domain.model.TicketStatus
 import cz.b2brental.domain.model.UserProfile
 import cz.b2brental.domain.model.WarrantyVerdict
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.headersOf
-import kotlinx.coroutines.flow.Flow
+import io.ktor.client.engine.mock.*
+import io.ktor.http.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -30,13 +23,13 @@ import org.junit.Test
  * Testy TicketRepository — přímé přesměrování na B2bApiClient.
  * Ověřuje parsování AI diagnostiky a chybové stavy (404, offline).
  */
-public class TicketRepositoryTest {
+class TicketRepositoryTest {
 
     /**
      * POST /tickets → 201 s AI diagnostikou (severity, warrantyVerdict, aiRecommendation).
      */
     @Test
-    public fun `create ticket returns 201 with AI diagnosis`(): Unit = runTest {
+    fun createTicketReturns201WithAiDiagnosis(): Unit = runTest {
         val ticketJson = """
             {"id":11,"equipmentId":1,"equipmentModel":"Liebherr GKv 5790","companyName":"Kuchyně s.r.o.","description":"Kompresor nechladí, teplota 12 °C","photoBase64":null,"severity":"critical","status":"new","warrantyVerdict":"covered","warrantyReason":"Porucha vznikla v záruční době","aiRecommendation":"Zkontrolujte kompresor a přívod chladiva","technicianId":null,"resolution":null,"createdAt":"2026-09-04T06:00:00Z","resolvedAt":null}
         """.trimIndent()
@@ -72,7 +65,7 @@ public class TicketRepositoryTest {
      * GET /tickets → 200 s polem tiketů různých stavů; nullable severity = null.
      */
     @Test
-    public fun `list tickets parses statuses`(): Unit = runTest {
+    fun listTicketsParsesStatuses(): Unit = runTest {
         val listJson = """
             [
               {"id":1,"equipmentId":5,"equipmentModel":"Infina NG 150","companyName":"Kuchyně s.r.o","description":"Chladnička nevychladuje, teplota 12 °C","status":"new","createdAt":"2026-09-01T08:00:00Z"},
@@ -105,7 +98,7 @@ public class TicketRepositoryTest {
      * GET /tickets/99 → 404 → ApiException(code=NOT_FOUND, httpStatus=404).
      */
     @Test
-    public fun `get ticket 404 throws ApiException`(): Unit = runTest {
+    fun getTicket404ThrowsApiException(): Unit = runTest {
         val mockEngine = MockEngine { request ->
             if (request.url.encodedPath == "/tickets/99") {
                 respond(
@@ -133,7 +126,7 @@ public class TicketRepositoryTest {
      * POST /tickets s IOException → OfflineException (transformace v safeApiCall).
      */
     @Test
-    public fun `create ticket offline throws OfflineException`(): Unit = runTest {
+    fun createTicketOfflineThrowsOfflineException(): Unit = runTest {
         val mockEngine = MockEngine { _ ->
             throw java.io.IOException("Connection refused")
         }
@@ -155,16 +148,22 @@ public class TicketRepositoryTest {
 
     private class FakeTestTokenStorage : TokenStorage {
         private val _session = MutableStateFlow<UserProfile?>(null)
-        override val session: Flow<UserProfile?> = _session
+        override val session: StateFlow<UserProfile?> = _session
 
         @Suppress("RedundantNullableReturnType")
         override suspend fun currentToken(): String? = "test-token"
 
-        override suspend fun save(profile: UserProfile) { _session.value = profile }
-        override suspend fun clear() { _session.value = null }
+        override suspend fun save(profile: UserProfile) {
+            _session.value = profile
+        }
+
+        override suspend fun clear() {
+            _session.value = null
+        }
     }
 
     private class FakeTestSessionClearer : SessionClearer {
-        override suspend fun clearSession() { /* no-op */ }
+        override suspend fun clearSession() { /* no-op */
+        }
     }
 }

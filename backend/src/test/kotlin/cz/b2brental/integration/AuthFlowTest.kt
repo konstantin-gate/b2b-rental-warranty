@@ -24,12 +24,14 @@ class AuthFlowTest {
                 client.post("/auth/register-company") {
                     contentType(ContentType.Application.Json)
                     setBody(
-                        "{\"companyName\":\"Test Corp\",\"inn\":\"28745001\",\"address\":\"Praha\",\"adminEmail\":\"newadm@test.cz\",\"password\":\"secret123\"}",
+                        "{\"companyName\":\"Test Corp\",\"inn\":\"28745019\"," +
+                            "\"address\":\"Praha\",\"adminEmail\":\"newadm@test.cz\"," +
+                            "\"password\":\"secret1234abcd\"}",
                     )
                 }
             assertEquals(HttpStatusCode.Created, regResp.status)
 
-            val token = login("admin@b2b.demo", "admin123")
+            val token = login("admin@b2b.demo", "admin1234abcd")
             assertTrue(token.isNotBlank())
 
             val failResp =
@@ -42,12 +44,15 @@ class AuthFlowTest {
             val unauthCatalog = client.get("/catalog")
             assertEquals(HttpStatusCode.Unauthorized, unauthCatalog.status)
 
-            val techToken = login("tech@b2b.demo", "tech123")
+            val techToken = login("tech@b2b.demo", "tech12345abcd")
             val forbiddenAdd =
                 client.post("/catalog") {
                     header(HttpHeaders.Authorization, "Bearer $techToken")
                     contentType(ContentType.Application.Json)
-                    setBody("{\"categoryId\":1,\"model\":\"M\",\"serialNumber\":\"SN99\",\"price\":\"1000.00\",\"monthlyRate\":\"100.00\"}")
+                    setBody(
+                        "{\"categoryId\":1,\"model\":\"M\",\"serialNumber\":\"SN99\"," +
+                            "\"price\":\"1000.00\",\"monthlyRate\":\"100.00\"}",
+                    )
                 }
             assertEquals(HttpStatusCode.Forbidden, forbiddenAdd.status)
         }

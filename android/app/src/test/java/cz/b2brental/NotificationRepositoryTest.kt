@@ -8,14 +8,10 @@ import cz.b2brental.data.remote.SessionClearer
 import cz.b2brental.data.remote.createB2bHttpClient
 import cz.b2brental.data.repository.NotificationRepositoryImpl
 import cz.b2brental.domain.model.UserProfile
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.headersOf
-import kotlinx.coroutines.flow.Flow
+import io.ktor.client.engine.mock.*
+import io.ktor.http.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -88,16 +84,22 @@ public class NotificationRepositoryTest {
 
     private class FakeTestTokenStorage : TokenStorage {
         private val _session = MutableStateFlow<UserProfile?>(null)
-        override val session: Flow<UserProfile?> = _session
+        override val session: StateFlow<UserProfile?> = _session
 
         @Suppress("RedundantNullableReturnType")
         override suspend fun currentToken(): String? = "test-token"
 
-        override suspend fun save(profile: UserProfile) { _session.value = profile }
-        override suspend fun clear() { _session.value = null }
+        override suspend fun save(profile: UserProfile) {
+            _session.value = profile
+        }
+
+        override suspend fun clear() {
+            _session.value = null
+        }
     }
 
     private class FakeTestSessionClearer : SessionClearer {
-        override suspend fun clearSession() { /* no-op */ }
+        override suspend fun clearSession() { /* no-op */
+        }
     }
 }

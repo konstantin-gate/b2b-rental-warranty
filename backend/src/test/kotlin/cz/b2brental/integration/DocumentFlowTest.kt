@@ -24,9 +24,9 @@ class DocumentFlowTest {
     @Test
     fun documentLifecycleAndDownloadFlow(): Unit =
         withB2bTestApp("doc-flow") {
-            val clientToken = login("kitchen@b2b.demo", "kitchen123")
-            val managerToken = login("manager@b2b.demo", "manager123")
-            val techToken = login("tech@b2b.demo", "tech123")
+            val clientToken = login("kitchen@b2b.demo", "kitchen1234abcd")
+            val managerToken = login("manager@b2b.demo", "manager1234abcd")
+            val techToken = login("tech@b2b.demo", "tech12345abcd")
 
             // Druhá firma a její klient pro test izolace přístupu (přímý zápis do testovací DB)
             transaction {
@@ -131,26 +131,26 @@ class DocumentFlowTest {
             assertTrue(bytes.size > 200)
             assertEquals("%PDF-", String(bytes, 0, 5))
 
-            // 9. Izolace: klient druhé firmy nemá přístup (403)
+            // 9. Izolace: klient druhé firmy nemá přístup (404)
             val otherClientForbidden =
                 client.get("/documents/$contractDocId/pdf") {
                     header(HttpHeaders.Authorization, "Bearer $otherClientToken")
                 }
-            assertEquals(HttpStatusCode.Forbidden, otherClientForbidden.status)
+            assertEquals(HttpStatusCode.NotFound, otherClientForbidden.status)
 
-            // 10. Technik nesmí stáhnout smlouvu (403)
+            // 10. Technik nesmí stáhnout smlouvu (404)
             val techForbiddenContract =
                 client.get("/documents/$contractDocId/pdf") {
                     header(HttpHeaders.Authorization, "Bearer $techToken")
                 }
-            assertEquals(HttpStatusCode.Forbidden, techForbiddenContract.status)
+            assertEquals(HttpStatusCode.NotFound, techForbiddenContract.status)
 
-            // 11. Technik nesmí stáhnout fakturu (403)
+            // 11. Technik nesmí stáhnout fakturu (404)
             val techForbiddenInvoice =
                 client.get("/documents/$invoiceDocId/pdf") {
                     header(HttpHeaders.Authorization, "Bearer $techToken")
                 }
-            assertEquals(HttpStatusCode.Forbidden, techForbiddenInvoice.status)
+            assertEquals(HttpStatusCode.NotFound, techForbiddenInvoice.status)
 
             // 12. Neautorizovaný přístup (401)
             val unauthResp = client.get("/documents/$contractDocId/pdf")

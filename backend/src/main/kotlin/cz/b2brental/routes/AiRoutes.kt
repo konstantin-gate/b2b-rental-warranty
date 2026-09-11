@@ -2,10 +2,12 @@
 
 package cz.b2brental.routes
 
+import cz.b2brental.auth.JwtService
 import cz.b2brental.db.ContractItems
 import cz.b2brental.db.ContractStatus
 import cz.b2brental.db.Equipment
 import cz.b2brental.db.RentalContracts
+import cz.b2brental.db.ServiceTickets
 import cz.b2brental.db.WarrantyVerdict
 import cz.b2brental.models.AssistantRequest
 import cz.b2brental.models.AssistantResponse
@@ -22,7 +24,9 @@ import cz.b2brental.services.WarrantyPrelude
 import cz.b2brental.services.WarrantyService
 import cz.b2brental.services.buildWarrantyPrelude
 import cz.b2brental.utils.BadRequestException
+import cz.b2brental.utils.ForbiddenException
 import cz.b2brental.utils.NotFoundException
+import cz.b2brental.utils.requirePlatform
 import cz.b2brental.utils.requireRole
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
@@ -55,6 +59,22 @@ public fun Route.aiRoutes(
                 if (req.description.isBlank()) {
                     throw BadRequestException("Popis nesmí být prázdný")
                 }
+                if (req.description.length > 24_000) {
+                    throw BadRequestException("Popis musí mít max. 24 000 znaků")
+                }
+                req.photoBase64?.let { photo ->
+                    val decoded: ByteArray =
+                        try {
+                            java.util.Base64
+                                .getDecoder()
+                                .decode(photo)
+                        } catch (_: IllegalArgumentException) {
+                            throw BadRequestException("Fotografie není platný Base64 řetězec")
+                        }
+                    if (decoded.size > 4 * 1024 * 1024) {
+                        throw BadRequestException("Fotografie je příliš velká (max. 4 MB)")
+                    }
+                }
                 val kb =
                     knowledgeBaseService.retrieve(
                         KnowledgeQuery(
@@ -74,12 +94,52 @@ public fun Route.aiRoutes(
             post("/warranty-check") {
                 call.requireRole("manager", "admin", "technician")
                 val req = call.receive<WarrantyCheckRequest>()
+                // Kontext volajícího (role, companyId, userId, scope) z JWT tokenu
+                val ctx = call.callerContext()
+                // Tenantský uživatel bez firmy nemá přístup (403) před transakcí
+                val tenantCompanyId: Long? =
+                    if (ctx.scope == JwtService.SCOPE_TENANT) {
+                        ctx.companyId ?: throw ForbiddenException("Uživatel nemá přiřazenou společnost")
+                    } else {
+                        null
+                    }
 
                 val prelude: WarrantyPrelude =
                     transaction {
+                        // Ověření přístupu k vybavení podle role a scope
                         val eqRow =
                             Equipment.selectAll().where { Equipment.id eq req.equipmentId.value }.singleOrNull()
                                 ?: throw NotFoundException("Vybavení nenalezeno")
+
+                        when (ctx.role) {
+                            "technician" -> {
+                                // Technik: vybavení musí být v tiketu přiřazeném právě jemu (userId, ne Users.id)
+                                val hasAccess =
+                                    ServiceTickets
+                                        .selectAll()
+                                        .where {
+                                            (ServiceTickets.equipmentId eq req.equipmentId.value) and
+                                                (ServiceTickets.technicianId eq ctx.userId)
+                                        }.firstOrNull() != null
+                                if (!hasAccess) throw NotFoundException("Vybavení nenalezeno")
+                            }
+
+                            "manager", "admin" -> {
+                                if (tenantCompanyId != null) {
+                                    // Tenant: vybavení musí být v aktivní smlouvě jeho firmy
+                                    val hasAccess =
+                                        (ContractItems innerJoin RentalContracts)
+                                            .selectAll()
+                                            .where {
+                                                (ContractItems.equipmentId eq req.equipmentId.value) and
+                                                    (RentalContracts.status eq ContractStatus.active) and
+                                                    (RentalContracts.companyId eq tenantCompanyId)
+                                            }.firstOrNull() != null
+                                    if (!hasAccess) throw NotFoundException("Vybavení nenalezeno")
+                                }
+                                // Platformový manager/admin — bez filtru
+                            }
+                        }
 
                         val activeContract =
                             (ContractItems innerJoin RentalContracts)
@@ -103,8 +163,6 @@ public fun Route.aiRoutes(
                         WarrantyService.evaluate(
                             contractStartDate = prelude.contractStartDate,
                             warrantyMonths = prelude.warrantyMonths,
-                            description = req.description ?: "",
-                            excludedCauses = prelude.excludedCauses,
                             today = LocalDate.now(),
                         )
                     }
@@ -126,10 +184,13 @@ public fun Route.aiRoutes(
             }
 
             post("/assistant") {
-                call.requireRole("manager", "admin")
+                call.requirePlatform("manager", "admin")
                 val req = call.receive<AssistantRequest>()
                 if (req.message.isBlank()) {
                     throw BadRequestException("Zpráva nesmí být prázdná")
+                }
+                if (req.message.length > 2_000) {
+                    throw BadRequestException("Zpráva musí mít max. 2 000 znaků")
                 }
                 val kb =
                     knowledgeBaseService.retrieve(

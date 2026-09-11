@@ -34,7 +34,7 @@ public interface AuthRepository {
     ): Unit
 
     /**
-     * Odhlášení uživatele — vymaže session z DataStore.
+     * Odhlášení uživatele — zneplatní token na serveru a vymaže lokální session a offline cache.
      */
     public suspend fun logout(): Unit
 

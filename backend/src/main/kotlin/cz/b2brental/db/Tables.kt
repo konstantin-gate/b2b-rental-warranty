@@ -19,7 +19,7 @@ public object Companies : LongIdTable("companies") {
     public val name: Column<String> = varchar("name", 200)
 
     /** Identifikační číslo (INN) firmy */
-    public val inn: Column<String> = varchar("inn", 50)
+    public val inn: Column<String> = varchar("inn", 50).uniqueIndex("uq_companies_inn")
 
     /** Sídlo firmy */
     public val address: Column<String> = varchar("address", 300)
@@ -332,5 +332,53 @@ public object KnowledgeChunks : LongIdTable("knowledge_chunks") {
 
     init {
         uniqueIndex("uq_knowledge_chunks_document_ordinal", documentId, ordinal)
+    }
+}
+
+/** Neúspěšné pokusy o přihlášení (základ pro dočasnou blokaci podle e-mailu) */
+public object LoginAttempts : LongIdTable("login_attempts") {
+    /** E-mail, pro který byl pokus zaznamenán (malými písmeny) */
+    public val email: Column<String> = varchar("email", 200)
+
+    /** Čas pokusu v milisekundách epochy */
+    public val attemptedAtMs: Column<Long> = long("attempted_at_ms")
+
+    init {
+        // Neunikátní index pro rychlé hledání pokusů podle e-mailu
+        index(false, email)
+        // Neunikátní index pro čištění pokusů podle času
+        index(false, attemptedAtMs)
+    }
+}
+
+/** Aktivní blokace přihlášení podle e-mailu */
+public object LoginBlocks : LongIdTable("login_blocks") {
+    /** E-mail, pro který je blokace aktivní (malými písmeny) */
+    public val email: Column<String> = varchar("email", 200)
+
+    /** Čas konce blokace v milisekundách epochy */
+    public val blockedUntilMs: Column<Long> = long("blocked_until_ms")
+
+    init {
+        // Neunikátní index pro rychlé hledání blokace podle e-mailu
+        index(false, email)
+        // Neunikátní index pro čištění blokací podle času
+        index(false, blockedUntilMs)
+    }
+}
+
+/** Odvolané JWT tokeny podle identifikátoru jti */
+public object RevokedTokens : LongIdTable("revoked_tokens") {
+    /** Jednoznačný identifikátor tokenu (jti) */
+    public val jti: Column<String> = varchar("jti", 64)
+
+    /** Čas expirace tokenu v milisekundách epochy */
+    public val expiresAtMs: Column<Long> = long("expires_at_ms")
+
+    init {
+        // Neunikátní index pro rychlé hledání odvolaného tokenu
+        index(false, jti)
+        // Neunikátní index pro čištění odvolaných tokenů podle času
+        index(false, expiresAtMs)
     }
 }

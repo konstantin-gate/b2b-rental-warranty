@@ -2,6 +2,7 @@
 
 package cz.b2brental.services
 
+import cz.b2brental.auth.JwtService
 import cz.b2brental.db.Companies
 import cz.b2brental.db.ContractItems
 import cz.b2brental.db.ContractStatus
@@ -64,6 +65,9 @@ public class TicketService(
         if (req.description.length < MIN_DESCRIPTION_LENGTH) {
             throw BadRequestException("Popis musí mít alespoň $MIN_DESCRIPTION_LENGTH znaků")
         }
+        if (req.description.length > MAX_DESCRIPTION_LENGTH) {
+            throw BadRequestException("Popis musí mít max. $MAX_DESCRIPTION_LENGTH znaků")
+        }
 
         if (req.photoBase64 != null) {
             val decoded: ByteArray =
@@ -125,8 +129,6 @@ public class TicketService(
                 WarrantyService.evaluate(
                     contractStartDate = prelude.contractStartDate,
                     warrantyMonths = prelude.warrantyMonths,
-                    description = req.description,
-                    excludedCauses = prelude.excludedCauses,
                     today = LocalDate.now(),
                 )
             }
@@ -183,17 +185,27 @@ public class TicketService(
      * @param callerUserId id volajícího uživatele
      * @param role role volajícího (admin/manager/technician/client)
      * @param callerCompanyId id společnosti volajícího klienta nebo null
+     * @param callerScope scope volajícího (platform/tenant)
      * @return seznam tiketů dostupných volajícímu podle jeho role
      */
     public fun list(
         callerUserId: Long,
         role: String,
         callerCompanyId: Long?,
+        callerScope: String,
     ): List<TicketResponse> =
         transaction {
             val query = ServiceTickets.selectAll()
             when (role) {
-                "admin", "manager" -> Unit
+                "admin", "manager" -> {
+                    if (callerScope == JwtService.SCOPE_TENANT) {
+                        val compId: Long =
+                            callerCompanyId
+                                ?: throw ForbiddenException("Manažer nemá přiřazenou společnost")
+                        query.where { ServiceTickets.companyId eq compId }
+                    }
+                }
+
                 "technician" -> query.where { ServiceTickets.technicianId eq callerUserId }
                 "client" -> {
                     val compId: Long =
@@ -201,6 +213,7 @@ public class TicketService(
                             ?: throw ForbiddenException("Klient nemá přiřazenou společnost")
                     query.where { ServiceTickets.companyId eq compId }
                 }
+
                 else -> throw ForbiddenException("Role nemá přístup k tiketům")
             }
             query.map(::toResponse)
@@ -212,6 +225,7 @@ public class TicketService(
      * @param callerUserId id volajícího uživatele
      * @param role role volajícího (admin/manager/technician/client)
      * @param callerCompanyId id společnosti volajícího klienta nebo null
+     * @param callerScope scope volajícího (platform/tenant)
      * @return detail tiketu
      */
     public fun get(
@@ -219,6 +233,7 @@ public class TicketService(
         callerUserId: Long,
         role: String,
         callerCompanyId: Long?,
+        callerScope: String,
     ): TicketResponse =
         transaction {
             val row =
@@ -229,18 +244,25 @@ public class TicketService(
                     ?: throw NotFoundException("Tiket nenalezen")
 
             when (role) {
-                "admin", "manager" -> Unit
+                "admin", "manager" -> {
+                    if (callerScope == JwtService.SCOPE_TENANT && row[ServiceTickets.companyId].value != callerCompanyId) {
+                        throw NotFoundException("Tiket nenalezen")
+                    }
+                }
+
                 "technician" -> {
                     if (row[ServiceTickets.technicianId]?.value != callerUserId) {
-                        throw ForbiddenException("Tiket není přiřazen vám")
+                        throw NotFoundException("Tiket nenalezen")
                     }
                 }
+
                 "client" -> {
                     if (row[ServiceTickets.companyId].value != callerCompanyId) {
-                        throw ForbiddenException("Nemáte přístup k tomuto tiketu")
+                        throw NotFoundException("Tiket nenalezen")
                     }
                 }
-                else -> throw ForbiddenException("Nemáte přístup k tomuto tiketu")
+
+                else -> throw NotFoundException("Tiket nenalezen")
             }
 
             toResponse(row)
@@ -251,12 +273,16 @@ public class TicketService(
      * @param id identifikátor tiketu
      * @param callerUserId id volajícího uživatele (autor záznamu v historii)
      * @param req požadavek s id technika
+     * @param callerCompanyId id společnosti volajícího (pro tenant kontrolu)
+     * @param callerScope scope volajícího (platform/tenant)
      * @return nový stav tiketu (assigned)
      */
     public fun assign(
         id: TicketId,
         callerUserId: Long,
         req: AssignRequest,
+        callerCompanyId: Long?,
+        callerScope: String,
     ): TicketActionResponse =
         transaction {
             val row =
@@ -266,18 +292,28 @@ public class TicketService(
                     .singleOrNull()
                     ?: throw NotFoundException("Tiket nenalezen")
 
+            if (callerScope == JwtService.SCOPE_TENANT && row[ServiceTickets.companyId].value != callerCompanyId) {
+                throw NotFoundException("Tiket nenalezen")
+            }
+
             if (row[ServiceTickets.status] != TicketStatus.new) {
                 throw ConflictException("Přiřadit lze pouze tiket ve stavu new")
             }
 
-            val techExists: Boolean =
+            val technicianRow =
                 Users
                     .selectAll()
                     .where {
                         (Users.id eq req.technicianId.value) and (Users.role eq ROLE_TECHNICIAN)
-                    }.count() > 0L
-            if (!techExists) {
-                throw BadRequestException("Technik nenalezen")
+                    }.singleOrNull()
+                    ?: throw BadRequestException("Technik nenalezen")
+
+            // Tenant smí přiřadit pouze platformového technika nebo technika své firmy
+            if (callerScope == JwtService.SCOPE_TENANT) {
+                val technicianCompanyId: Long? = technicianRow[Users.companyId]?.value
+                if (technicianCompanyId != null && technicianCompanyId != callerCompanyId) {
+                    throw NotFoundException("Technik nenalezen")
+                }
             }
 
             ServiceTickets.update({ ServiceTickets.id eq id.value }) {
@@ -317,7 +353,7 @@ public class TicketService(
                     ?: throw NotFoundException("Tiket nenalezen")
 
             if (row[ServiceTickets.technicianId]?.value != callerUserId) {
-                throw ForbiddenException("Tiket není přiřazen vám")
+                throw NotFoundException("Tiket nenalezen")
             }
 
             if (row[ServiceTickets.status] != TicketStatus.assigned) {
@@ -362,7 +398,7 @@ public class TicketService(
                     ?: throw NotFoundException("Tiket nenalezen")
 
             if (row[ServiceTickets.technicianId]?.value != callerUserId) {
-                throw ForbiddenException("Tiket není přiřazen vám")
+                throw NotFoundException("Tiket nenalezen")
             }
 
             if (row[ServiceTickets.status] != TicketStatus.in_progress) {
@@ -477,6 +513,7 @@ public class TicketService(
      * @param role role volajícího (technician/client)
      * @param callerCompanyId id společnosti volajícího klienta nebo null
      * @param callerUserId id volajícího uživatele
+     * @param callerScope scope volajícího (platform/tenant)
      * @return odpověď s dokumentem PDF servisní zprávy
      */
     public fun pdfDocument(
@@ -484,6 +521,7 @@ public class TicketService(
         role: String,
         callerCompanyId: Long?,
         callerUserId: Long,
+        callerScope: String,
     ): DocumentPdfResponse =
         transaction {
             val ticket =
@@ -496,17 +534,24 @@ public class TicketService(
                 "client" -> {
                     val ownerCompanyId: Long = ticket[ServiceTickets.companyId].value
                     if (callerCompanyId != ownerCompanyId) {
-                        throw ForbiddenException("Nemáte přístup k tomuto tiketu")
+                        throw NotFoundException("Tiket nenalezen")
                     }
                 }
+
                 "technician" -> {
                     val assignedTechId: Long? = ticket[ServiceTickets.technicianId]?.value
                     if (assignedTechId != callerUserId) {
-                        throw ForbiddenException("Nemáte přístup k tomuto tiketu")
+                        throw NotFoundException("Tiket nenalezen")
                     }
                 }
-                "manager", "admin" -> Unit
-                else -> throw ForbiddenException("Role nemá přístup")
+
+                "manager", "admin" -> {
+                    if (callerScope == JwtService.SCOPE_TENANT && ticket[ServiceTickets.companyId].value != callerCompanyId) {
+                        throw NotFoundException("Tiket nenalezen")
+                    }
+                }
+
+                else -> throw NotFoundException("Tiket nenalezen")
             }
 
             if (ticket[ServiceTickets.status] != TicketStatus.resolved) {
@@ -541,6 +586,9 @@ public class TicketService(
     public companion object {
         /** Minimální délka popisu závady. */
         public const val MIN_DESCRIPTION_LENGTH: Int = 10
+
+        /** Maximální délka popisu závady. */
+        public const val MAX_DESCRIPTION_LENGTH: Int = 10_000
 
         /** Maximální velikost fotografie po dekódování (4 MB). */
         public const val MAX_PHOTO_BYTES: Int = 4 * 1024 * 1024

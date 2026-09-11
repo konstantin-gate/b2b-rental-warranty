@@ -49,6 +49,9 @@ public object DatabaseFactory {
                 HistoryEvents,
                 Documents,
                 Notifications,
+                LoginAttempts,
+                LoginBlocks,
+                RevokedTokens,
                 KnowledgeDocuments,
                 KnowledgeChunks,
             )

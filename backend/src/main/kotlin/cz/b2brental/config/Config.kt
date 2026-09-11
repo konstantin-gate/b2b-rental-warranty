@@ -19,6 +19,7 @@ package cz.b2brental.config
  * @property aiMaxRetries maximální počet opakování neúspěšného volání LLM (env AI_MAX_RETRIES)
  * @property aiMaxOutputTokens maximální počet výstupních tokenů LLM (env AI_MAX_OUTPUT_TOKENS)
  * @property aiEnabled příznak zapnuté AI funkcionality (env AI_ENABLED)
+ * @property seedDemoData příznak naplnění demo daty (env SEED_DEMO_DATA)
  */
 public data class Config(
     public val dbUrl: String,
@@ -33,6 +34,7 @@ public data class Config(
     public val aiMaxRetries: Int,
     public val aiMaxOutputTokens: Int,
     public val aiEnabled: Boolean,
+    public val seedDemoData: Boolean,
 ) {
     public companion object {
         /**
@@ -54,6 +56,9 @@ public data class Config(
             val jwtSecret: String =
                 System.getenv("JWT_SECRET")
                     ?: throw IllegalStateException("Chybí povinná proměnná prostředí: JWT_SECRET")
+            if (jwtSecret.length < 32) {
+                throw IllegalStateException("Proměnná prostředí JWT_SECRET musí mít alespoň 32 znaků")
+            }
 
             val aiBaseUrl: String =
                 (System.getenv("AI_BASE_URL") ?: "http://127.0.0.1:8080/v1").trim()
@@ -88,6 +93,10 @@ public data class Config(
                 throw IllegalStateException("Proměnná prostředí AI_MAX_OUTPUT_TOKENS musí být kladné číslo")
             }
 
+            val seedDemoData: Boolean =
+                (System.getenv("SEED_DEMO_DATA") ?: "false").toBooleanStrictOrNull()
+                    ?: throw IllegalStateException("Proměnná prostředí SEED_DEMO_DATA musí být true nebo false")
+
             return Config(
                 dbUrl = dbUrl,
                 dbUser = dbUser,
@@ -101,6 +110,7 @@ public data class Config(
                 aiMaxRetries = aiMaxRetries,
                 aiMaxOutputTokens = aiMaxOutputTokens,
                 aiEnabled = aiEnabled,
+                seedDemoData = seedDemoData,
             )
         }
 
