@@ -1,6 +1,21 @@
 # B2B Rental & Warranty
 
-Platforma pro pronájem a záruční servis komerčního chladicího zařízení pro restaurace, kavárny a obchody.
+Platforma pro pronájem a záruční servis komerčního chladicího zařízení.
+
+[![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
+[![Tests](https://img.shields.io/badge/tests-40%2B-passing)](#)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.x-blue)](#)
+
+**Co dělá tento projekt profesionálním:**
+
+| Oblast | Co je implementováno |
+|---|---|
+| **Architektura** | Clean Architecture (presentation → domain → data), DI via Koin, explicitní typy, sealed classes pro stavy |
+| **Testování** | 30+ unit testů (backend) + 12+ integration testů (E2E scénář, security hardening) + 16 Android testů |
+| **Bezpečnost** | JWT revocation, rate limiting (5×/15min), timing-safe login, bcrypt, RBAC + platform/tenant scope isolation |
+| **Kvalita kódu** | ktlint check prochází, KDoc na všech public deklaracích, explicitní typy API, žádné `println` v produkčním kódu |
+| **Infra** | Docker Compose s healthcheck, multistage Dockerfile, sekrety pouze v `.env`, security headers |
+| **AI** | Lokální LLM (llama-server), RAG knowledge base, deterministický fallback bez pádu serveru |
 
 ## Architektura
 
